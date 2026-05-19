@@ -19,12 +19,6 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Debug
-        run: |
-          node --version
-          npm --version
-          npm whoami --registry https://registry.npmjs.org || echo "not logged in (expected with OIDC)"
-
       - name: Install dependencies
         run: npm ci
 
