@@ -6,7 +6,7 @@ title: 'fea-docs'
 
 Zero-config documentation previewer and builder for any repository.
 
-Run `npx fea-docs start` from any directory and get a live Starlight-powered docs site from your existing Markdown and MDX files — no framework setup, no configuration required.
+Run `npx fea-docs@latest start` from any directory and get a live Starlight-powered docs site from your existing Markdown and MDX files — no framework setup, no configuration required.
 
 ## Features
 
@@ -25,30 +25,32 @@ Run `npx fea-docs start` from any directory and get a live Starlight-powered doc
 
 ## Usage
 
+> Always use `npx fea-docs@latest` to ensure you get the newest version. Without `@latest`, npx may use a previously cached version.
+
 ```sh
 # Start a live preview from the current directory
-npx fea-docs start
+npx fea-docs@latest start
 
 # Start on a specific port and open the browser
-npx fea-docs start --port 3000 --open
+npx fea-docs@latest start --port 3000 --open
 
 # Build static output for deployment
-npx fea-docs build --out-dir ./dist
+npx fea-docs@latest build --out-dir ./dist
 
 # Bootstrap GitHub Pages deployment
-npx fea-docs setup gh-pages
+npx fea-docs@latest setup gh-pages
 
 # Enable strict validation (default in build mode)
-npx fea-docs start --strict
+npx fea-docs@latest start --strict
 
 # Enable a framework adapter
-npx fea-docs start --framework react
+npx fea-docs@latest start --framework react
 
 # Share via Tailscale (requires explicit --expose consent)
-npx fea-docs start --tailscale-serve --expose
+npx fea-docs@latest start --tailscale-serve --expose
 
 # Prevent macOS sleep during a long session
-npx fea-docs start --caffeinate
+npx fea-docs@latest start --caffeinate
 ```
 
 ### Port precedence
@@ -85,7 +87,7 @@ The [`example/`](./example/) directory contains a minimal repository you can use
 
 ```sh
 cd example
-npx fea-docs start
+npx fea-docs@latest start
 ```
 
 ## Requirements
