@@ -6,6 +6,7 @@ import { ContentGraphEngine } from '../../content-graph/engine.js';
 import { NavigationBuilder } from '../../navigation/builder.js';
 import { RuntimeAdapter } from '../../runtime/adapter.js';
 import { SessionCacheManager } from '../../cache/manager.js';
+import { ensureGitignore } from '../../utils/gitignore.js';
 import type { ResolvedConfig } from '../../types.js';
 
 export function startCommand(): Command {
@@ -57,6 +58,7 @@ export function startCommand(): Command {
         const adapter = new RuntimeAdapter({ config, graph, navTree });
         if (!cacheHit) {
           console.log(pc.cyan('Preparing Starlight runtime...'));
+          ensureGitignore(config.root);
           await adapter.materialize();
           cache.save(config);
         }

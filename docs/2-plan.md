@@ -4,7 +4,7 @@ title: "Docs App Issue Plan"
 
 ## Source PRD
 
-- Local PRD: `1-prd.md`
+- Local PRD: [`1-prd.md`](1-prd.md)
 - Parent GitHub PRD issue: TBD (needed before creating child issues)
 
 ## Proposed Vertical Slices (Tracer Bullets)
@@ -43,7 +43,7 @@ title: "Docs App Issue Plan"
    - **Type:** AFK
    - **Blocked by:** #4, #5
    - **User stories covered:** 20, 21, 22, 23, 24
-   - **What this slice proves:** `--strict` fails on broken internal links, unresolved assets/images, duplicate slugs, metadata failures, and MDX import resolution errors.
+   - **What this slice proves:** `--strict` fails on broken internal links, unresolved assets/images, duplicate URL paths, metadata failures, and MDX import resolution errors.
 
 7. **Title:** MDX activation with local and npm component imports
    - **Type:** AFK

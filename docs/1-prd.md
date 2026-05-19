@@ -42,7 +42,7 @@ The CLI also supports static build output (`build`) and one-command GitHub Pages
 18. As a docs author, I want remote images to render correctly, so that externally hosted assets can be used.
 19. As a docs author, I want permissive link validation in dev, so that I can keep writing while seeing warnings.
 20. As a CI owner, I want a strict mode that fails on broken links and unresolved assets, so that docs quality is enforceable.
-21. As a docs author, I want strict mode to fail on duplicate slugs, so that routing remains deterministic.
+21. As a docs author, I want strict mode to fail on duplicate URL paths, so that routing remains deterministic.
 22. As a docs author, I want strict mode to fail on frontmatter schema errors, so that metadata quality stays consistent.
 23. As a docs author, I want strict mode to fail on MDX import resolution issues, so that broken interactive pages are caught early.
 24. As a docs author, I want strict mode to fail when page title fallback cannot be determined, so that navigation labels are always valid.
@@ -84,10 +84,10 @@ The CLI also supports static build output (`build`) and one-command GitHub Pages
 - Navigation model mirrors source directory hierarchy.
 - Section index behavior maps directory `README` files to directory landing pages.
 - Navigation labels resolve by priority: frontmatter `title`, first H1, then filename.
-- Routing uses hybrid path strategy: stable source-derived paths with optional slug overrides.
+- Routing uses source-derived URL paths (`entryId` = relative path without extension, lowercased) that match Starlight's Content Layer routing exactly. No slug override mechanism.
 - Internal links and static-file references are rewritten/resolved for generated docs structure.
 - Dev mode favors productivity: warnings over hard failures for unresolved content issues.
-- Strict mode is CI-oriented and fails on link, slug, metadata, asset, and MDX import integrity errors.
+- Strict mode is CI-oriented and fails on broken links, duplicate URL paths, metadata, asset, and MDX import integrity errors.
 - MDX processing and framework adapters are activated only when required by discovered content and selected flags/config.
 - Custom component imports are supported from relative paths, alias roots, and npm dependencies.
 - Framework integrations (React, Vue, Svelte, Solid) are opt-in via CLI/config.

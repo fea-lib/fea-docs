@@ -6,7 +6,7 @@ function makePage(overrides: Partial<DocPage> & { rel: string }): DocPage {
   return {
     absolutePath: `/tmp/${overrides.rel}`,
     relativePath: overrides.rel,
-    slug: overrides.slug ?? overrides.rel.replace(/\.md$/, ''),
+    entryId: overrides.entryId ?? overrides.rel.replace(/\.md$/, '').toLowerCase(),
     label: overrides.label ?? 'Page',
     frontmatter: overrides.frontmatter ?? {},
     isSectionIndex: overrides.isSectionIndex ?? false,
@@ -19,8 +19,8 @@ describe('StrictValidator', () => {
     const graph: DocsGraph = {
       root: '/tmp',
       pages: [
-        makePage({ rel: 'a.md', label: 'A', slug: 'a' }),
-        makePage({ rel: 'b.md', label: 'B', slug: 'b' }),
+        makePage({ rel: 'a.md', label: 'A' }),
+        makePage({ rel: 'b.md', label: 'B' }),
       ],
     };
     const validator = new StrictValidator();
@@ -29,12 +29,12 @@ describe('StrictValidator', () => {
     expect(result.diagnostics).toHaveLength(0);
   });
 
-  it('detects duplicate slugs', () => {
+  it('detects duplicate entry ids (URL collisions)', () => {
     const graph: DocsGraph = {
       root: '/tmp',
       pages: [
-        makePage({ rel: 'a.md', slug: 'same', label: 'A' }),
-        makePage({ rel: 'b.md', slug: 'same', label: 'B' }),
+        makePage({ rel: 'a.md', entryId: 'same', label: 'A' }),
+        makePage({ rel: 'b.md', entryId: 'same', label: 'B' }),
       ],
     };
     const validator = new StrictValidator();

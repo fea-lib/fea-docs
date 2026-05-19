@@ -39,4 +39,6 @@ export const DEFAULT_IGNORE_GLOBS: string[] = [
   '**/.cache/**',
   '**/.turbo/**',
   '**/.astro/**',
+  // fea-docs workdir (must never be scanned)
+  '**/.fea-docs/**',
 ];

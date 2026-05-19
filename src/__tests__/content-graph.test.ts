@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { ContentGraphEngine } from '../content-graph/engine.js';
+import { injectFrontmatterTitle } from '../content-graph/parser.js';
 
 function makeTmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'fea-docs-test-'));
@@ -117,16 +118,60 @@ describe('ContentGraphEngine', () => {
     expect(mdx.relativePath).toBe('interactive.mdx');
   });
 
-  it('applies slug overrides', async () => {
-    writeFile(tmpDir, 'my-page.md', '# My Page');
+  it('derives entryId from relative path', async () => {
+    writeFile(tmpDir, 'My Page.md', '# My Page');
 
-    const engine = new ContentGraphEngine({
-      root: tmpDir,
-      ignore: [],
-      slugOverrides: { 'my-page.md': 'custom-slug' },
-    });
+    const engine = new ContentGraphEngine({ root: tmpDir, ignore: [] });
     const graph = await engine.scan();
 
-    expect(graph.pages[0].slug).toBe('custom-slug');
+    expect(graph.pages[0].entryId).toBe('my page');
+  });
+});
+
+describe('injectFrontmatterTitle', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fea-docs-inject-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('prepends a new frontmatter block when none exists', () => {
+    const filePath = path.join(tmpDir, 'no-fm.md');
+    fs.writeFileSync(filePath, '# Hello\n\nContent.');
+    injectFrontmatterTitle(filePath, '# Hello\n\nContent.', 'Hello');
+    const result = fs.readFileSync(filePath, 'utf-8');
+    expect(result).toMatch(/^---\ntitle: 'Hello'\n---/);
+    expect(result).toContain('# Hello');
+  });
+
+  it('inserts title into existing frontmatter block', () => {
+    const raw = `---\ndescription: foo\n---\n\n# Hello\n`;
+    const filePath = path.join(tmpDir, 'has-fm.md');
+    fs.writeFileSync(filePath, raw);
+    injectFrontmatterTitle(filePath, raw, 'Hello');
+    const result = fs.readFileSync(filePath, 'utf-8');
+    expect(result).toMatch(/^---\ntitle: 'Hello'\ndescription: foo/);
+  });
+
+  it('does not modify a file that already has a title', () => {
+    const raw = `---\ntitle: Existing\n---\n\n# Hello\n`;
+    const filePath = path.join(tmpDir, 'with-title.md');
+    fs.writeFileSync(filePath, raw);
+    const mtimeBefore = fs.statSync(filePath).mtimeMs;
+    injectFrontmatterTitle(filePath, raw, 'Hello');
+    const mtimeAfter = fs.statSync(filePath).mtimeMs;
+    expect(mtimeAfter).toBe(mtimeBefore);
+  });
+
+  it('escapes single quotes in the label', () => {
+    const filePath = path.join(tmpDir, 'apos.md');
+    fs.writeFileSync(filePath, 'Content.');
+    injectFrontmatterTitle(filePath, 'Content.', "Alice's Guide");
+    const result = fs.readFileSync(filePath, 'utf-8');
+    expect(result).toContain("title: 'Alice''s Guide'");
   });
 });

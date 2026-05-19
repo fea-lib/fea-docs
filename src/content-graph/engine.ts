@@ -16,12 +16,10 @@ import { parseDocFile } from './parser.js';
 export class ContentGraphEngine {
   private root: string;
   private ignoreGlobs: string[];
-  private slugOverrides: Record<string, string>;
 
-  constructor(config: Pick<ResolvedConfig, 'root' | 'ignore' | 'slugOverrides'>) {
+  constructor(config: Pick<ResolvedConfig, 'root' | 'ignore'>) {
     this.root = config.root;
     this.ignoreGlobs = [...DEFAULT_IGNORE_GLOBS, ...config.ignore];
-    this.slugOverrides = config.slugOverrides;
   }
 
   /**
@@ -59,7 +57,7 @@ export class ContentGraphEngine {
 
     const pages = filtered.map((relativePath) => {
       const absolutePath = path.join(this.root, relativePath);
-      return parseDocFile(absolutePath, relativePath, this.slugOverrides);
+      return parseDocFile(absolutePath, relativePath);
     });
 
     return { pages, root: this.root };

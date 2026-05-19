@@ -12,38 +12,6 @@ export function extractFirstH1(content: string): string | undefined {
 }
 
 /**
- * Derive a stable slug from a relative file path.
- * - Strips file extension
- * - Lowercases
- * - Replaces spaces/underscores with hyphens
- * - README -> '' (section index at directory level)
- */
-export function deriveSlug(relativePath: string, slugOverrides?: Record<string, string>): string {
-  if (slugOverrides && relativePath in slugOverrides) {
-    return slugOverrides[relativePath];
-  }
-
-  // Normalize separators
-  let slug = relativePath.replace(/\\/g, '/');
-
-  // Strip extension
-  slug = slug.replace(/\.(md|mdx)$/, '');
-
-  // Handle README as section index
-  if (slug === 'README' || slug.endsWith('/README')) {
-    slug = slug.replace(/\/?README$/, '');
-  }
-
-  // Lowercase and replace spaces/underscores with hyphens
-  slug = slug
-    .toLowerCase()
-    .replace(/[\s_]+/g, '-')
-    .replace(/[^a-z0-9/\-.]/g, '');
-
-  return slug || '/';
-}
-
-/**
  * Derive a human-readable label for a page.
  * Priority: frontmatter title -> first H1 -> filename stem.
  */
@@ -64,19 +32,48 @@ export function deriveLabel(
   // 3. Filename stem
   const basename = path.basename(relativePath);
   const stem = basename.replace(/\.(md|mdx)$/, '');
-  // Convert common separators to spaces for readability
   return stem.replace(/[-_]/g, ' ');
 }
 
 /**
- * Parse a single file and return a DocPage.
+ * Inject a `title` field into the raw file content if one is not already
+ * present in the frontmatter.
+ *
+ * - If a frontmatter block exists, `title: <label>` is inserted as the first
+ *   key inside it.
+ * - If no frontmatter block exists, a minimal `---\ntitle: <label>\n---\n`
+ *   block is prepended.
+ *
+ * The file on disk is written only when a change is actually needed.
  */
-export function parseDocFile(
-  absolutePath: string,
-  relativePath: string,
-  slugOverrides?: Record<string, string>,
-): DocPage {
-  const raw = fs.readFileSync(absolutePath, 'utf-8');
+export function injectFrontmatterTitle(absolutePath: string, raw: string, label: string): string {
+  const { data: frontmatter } = matter(raw);
+  if (typeof frontmatter['title'] === 'string' && frontmatter['title'].trim()) {
+    return raw;
+  }
+
+  const escapedLabel = label.replace(/'/g, "''");
+  const titleLine = `title: '${escapedLabel}'`;
+
+  let updated: string;
+  const hasFrontmatter = /^---[ \t]*\r?\n/.test(raw);
+  if (hasFrontmatter) {
+    updated = raw.replace(/^(---[ \t]*\r?\n)/, `$1${titleLine}\n`);
+  } else {
+    updated = `---\n${titleLine}\n---\n\n${raw}`;
+  }
+
+  fs.writeFileSync(absolutePath, updated, 'utf-8');
+  return updated;
+}
+
+/**
+ * Parse a single file and return a DocPage.
+ * If the file lacks a `title` in its frontmatter, one is injected into the
+ * source file on disk before the DocPage is returned.
+ */
+export function parseDocFile(absolutePath: string, relativePath: string): DocPage {
+  let raw = fs.readFileSync(absolutePath, 'utf-8');
   const { data: frontmatter, content } = matter(raw);
 
   const ext = absolutePath.endsWith('.mdx') ? 'mdx' : 'md';
@@ -84,34 +81,42 @@ export function parseDocFile(
   const isSectionIndex =
     basename === 'README.md' || basename === 'README.mdx' || basename === 'readme.md';
 
-  const slug = deriveSlug(relativePath, slugOverrides);
   const label = deriveLabel(frontmatter, content, relativePath);
+  // entryId: what Starlight's Content Layer glob() loader uses as the URL path.
+  const entryId = relativePath
+    .replace(/\\/g, '/')
+    .replace(/\.(md|mdx)$/, '')
+    .toLowerCase();
+
+  raw = injectFrontmatterTitle(absolutePath, raw, label);
+  const updatedFrontmatter = matter(raw).data;
 
   return {
     absolutePath,
     relativePath,
-    slug,
+    entryId,
     label,
-    frontmatter,
+    frontmatter: updatedFrontmatter,
     isSectionIndex,
     ext,
   };
 }
 
 /**
- * Validate that no two pages share the same slug.
- * Returns an array of duplicate slug entries.
+ * Validate that no two pages share the same entryId (URL path).
  */
-export function findDuplicateSlugs(pages: DocPage[]): Array<{ slug: string; pages: DocPage[] }> {
-  const bySlug = new Map<string, DocPage[]>();
+export function findDuplicateEntryIds(
+  pages: DocPage[],
+): Array<{ entryId: string; pages: DocPage[] }> {
+  const byEntryId = new Map<string, DocPage[]>();
   for (const page of pages) {
-    const group = bySlug.get(page.slug) ?? [];
+    const group = byEntryId.get(page.entryId) ?? [];
     group.push(page);
-    bySlug.set(page.slug, group);
+    byEntryId.set(page.entryId, group);
   }
-  return Array.from(bySlug.entries())
+  return Array.from(byEntryId.entries())
     .filter(([, pages]) => pages.length > 1)
-    .map(([slug, pages]) => ({ slug, pages }));
+    .map(([entryId, pages]) => ({ entryId, pages }));
 }
 
 export { DocsGraph };

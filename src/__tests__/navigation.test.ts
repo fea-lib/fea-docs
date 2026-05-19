@@ -9,6 +9,7 @@ function makeGraph(pages: Array<{ rel: string; label: string; slug: string; isIn
       absolutePath: `/tmp/test/${p.rel}`,
       relativePath: p.rel,
       slug: p.slug,
+      entryId: p.rel.replace(/\.(md|mdx)$/, '').toLowerCase(),
       label: p.label,
       frontmatter: {},
       isSectionIndex: p.isIndex ?? false,
@@ -44,9 +45,23 @@ describe('NavigationBuilder', () => {
     expect(nav[0].children).toHaveLength(2);
   });
 
+  it('emits top-level README as first nav item', () => {
+    const graph = makeGraph([
+      { rel: 'README.md', label: 'Home', slug: '', isIndex: true },
+      { rel: 'guide.md', label: 'Guide', slug: 'guide' },
+    ]);
+    const builder = new NavigationBuilder();
+    const nav = builder.build(graph);
+
+    expect(nav[0].label).toBe('Home');
+    expect(nav[0].entryId).toBe('readme');
+    expect(nav[0].isSectionIndex).toBe(true);
+    expect(nav[1].label).toBe('Guide');
+  });
+
   it('uses README as section index', () => {
     const graph = makeGraph([
-      { rel: 'guide/README.md', label: 'Guide Overview', slug: 'guide', isIndex: true },
+      { rel: 'guide/README.md', label: 'Guide Overview', slug: 'guide/guide', isIndex: true },
       { rel: 'guide/setup.md', label: 'Setup', slug: 'guide/setup' },
     ]);
     const builder = new NavigationBuilder();
@@ -54,7 +69,7 @@ describe('NavigationBuilder', () => {
 
     expect(nav).toHaveLength(1);
     expect(nav[0].label).toBe('Guide Overview');
-    expect(nav[0].slug).toBe('guide');
+    expect(nav[0].entryId).toBe('guide/readme');
     expect(nav[0].isSectionIndex).toBe(true);
     expect(nav[0].children).toHaveLength(1);
   });

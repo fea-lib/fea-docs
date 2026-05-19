@@ -1,5 +1,5 @@
 ---
-title: fea-docs README
+title: 'fea-docs'
 ---
 
 # fea-docs
@@ -12,7 +12,8 @@ Run `npx fea-docs start` from any directory and get a live Starlight-powered doc
 
 - **Instant preview** — discovers all `.md` and `.mdx` files under the current directory
 - **Hierarchical navigation** — sidebar mirrors your directory structure; `README` files become section indexes
-- **Smart labeling** — page titles resolve via frontmatter `title` → first H1 → filename
+- **Smart labeling** — page titles resolve via frontmatter `title` → first H1 → filename; missing titles are injected automatically
+- **No title duplication** — when a page has both a frontmatter title and an H1, the redundant H1 is suppressed at render time
 - **Gitignore-aware** — respects `.gitignore` and common technical directories (node_modules, dist, etc.)
 - **MDX support** — local, relative, and npm component imports work out of the box
 - **Framework adapters** — opt-in React, Vue, Svelte, and Solid integrations
@@ -73,6 +74,8 @@ export default {
 ## How it works
 
 On first run, `fea-docs` materializes an ephemeral Starlight project under `.fea-docs/app/` inside your working directory, installs its dependencies there, and starts the Astro dev server. Your content is symlinked into the generated project so edits are reflected live.
+
+During the scan phase, any file missing a frontmatter `title` has one injected automatically (derived from the first H1 or the filename). This mutation is idempotent and required by Starlight's content schema. If a file already has both a `title` in frontmatter and a matching H1, the H1 is suppressed at render time to avoid visual duplication.
 
 The `.fea-docs/` directory should be gitignored. A session cache fingerprints your config so subsequent runs skip the install step.
 

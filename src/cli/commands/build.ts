@@ -7,6 +7,7 @@ import { NavigationBuilder } from '../../navigation/builder.js';
 import { RuntimeAdapter } from '../../runtime/adapter.js';
 import { BuildExporter } from '../../build/exporter.js';
 import { StrictValidator } from '../../strict/validator.js';
+import { ensureGitignore } from '../../utils/gitignore.js';
 import type { ResolvedConfig } from '../../types.js';
 
 export function buildCommand(): Command {
@@ -53,6 +54,7 @@ export function buildCommand(): Command {
 
         const adapter = new RuntimeAdapter({ config, graph, navTree });
         console.log(pc.cyan('Preparing Starlight runtime...'));
+        ensureGitignore(config.root);
         await adapter.materialize();
 
         const outDir = path.resolve(opts.outDir);

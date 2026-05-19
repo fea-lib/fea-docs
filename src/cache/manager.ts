@@ -25,7 +25,6 @@ export class SessionCacheManager {
     const sig = JSON.stringify({
       root: config.root,
       ignore: config.ignore,
-      slugOverrides: config.slugOverrides,
       frameworks: config.frameworks,
       aliases: config.aliases,
     });

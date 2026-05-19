@@ -20,14 +20,14 @@ describe('LinkAssetResolver', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  function makeGraph(pages: Array<{ rel: string; slug: string }>): DocsGraph {
+  function makeGraph(pages: Array<{ rel: string }>): DocsGraph {
     return {
       root: tmpDir,
       pages: pages.map((p) => ({
         absolutePath: path.join(tmpDir, p.rel),
         relativePath: p.rel,
-        slug: p.slug,
-        label: p.slug,
+        entryId: p.rel.replace(/\.(md|mdx)$/, '').toLowerCase(),
+        label: p.rel,
         frontmatter: {},
         isSectionIndex: false,
         ext: 'md' as const,
@@ -36,7 +36,7 @@ describe('LinkAssetResolver', () => {
   }
 
   it('passes through external links', () => {
-    const graph = makeGraph([{ rel: 'index.md', slug: 'index' }]);
+    const graph = makeGraph([{ rel: 'index.md' }]);
     const resolver = new LinkAssetResolver(graph, true);
     const result = resolver.resolveLink('https://example.com', 'index.md');
     expect(result.resolved).toBe(true);
@@ -44,7 +44,7 @@ describe('LinkAssetResolver', () => {
   });
 
   it('passes through anchor links', () => {
-    const graph = makeGraph([{ rel: 'index.md', slug: 'index' }]);
+    const graph = makeGraph([{ rel: 'index.md' }]);
     const resolver = new LinkAssetResolver(graph, true);
     const result = resolver.resolveLink('#heading', 'index.md');
     expect(result.resolved).toBe(true);
@@ -53,17 +53,17 @@ describe('LinkAssetResolver', () => {
 
   it('resolves internal doc links', () => {
     const graph = makeGraph([
-      { rel: 'index.md', slug: 'index' },
-      { rel: 'guide/intro.md', slug: 'guide/intro' },
+      { rel: 'index.md' },
+      { rel: 'guide/intro.md' },
     ]);
     const resolver = new LinkAssetResolver(graph, true);
     const result = resolver.resolveLink('guide/intro.md', 'index.md');
     expect(result.resolved).toBe(true);
-    expect(result.href).toBe('/guide/intro');
+    expect(result.href).toBe('/guide/intro/');
   });
 
   it('emits warning for broken internal link in dev mode', () => {
-    const graph = makeGraph([{ rel: 'index.md', slug: 'index' }]);
+    const graph = makeGraph([{ rel: 'index.md' }]);
     const resolver = new LinkAssetResolver(graph, true);
     const result = resolver.resolveLink('missing.md', 'index.md');
     expect(result.resolved).toBe(false);
@@ -72,7 +72,7 @@ describe('LinkAssetResolver', () => {
   });
 
   it('emits error for broken internal link in strict mode', () => {
-    const graph = makeGraph([{ rel: 'index.md', slug: 'index' }]);
+    const graph = makeGraph([{ rel: 'index.md' }]);
     const resolver = new LinkAssetResolver(graph, false);
     const result = resolver.resolveLink('missing.md', 'index.md');
     expect(result.resolved).toBe(false);
@@ -81,7 +81,7 @@ describe('LinkAssetResolver', () => {
 
   it('resolves existing asset file', () => {
     fs.writeFileSync(path.join(tmpDir, 'logo.png'), 'fake-image');
-    const graph = makeGraph([{ rel: 'index.md', slug: 'index' }]);
+    const graph = makeGraph([{ rel: 'index.md' }]);
     const resolver = new LinkAssetResolver(graph, true);
     const result = resolver.resolveLink('logo.png', 'index.md');
     expect(result.resolved).toBe(true);
@@ -89,7 +89,7 @@ describe('LinkAssetResolver', () => {
   });
 
   it('emits warning for missing asset in dev mode', () => {
-    const graph = makeGraph([{ rel: 'index.md', slug: 'index' }]);
+    const graph = makeGraph([{ rel: 'index.md' }]);
     const resolver = new LinkAssetResolver(graph, true);
     const result = resolver.resolveLink('missing.png', 'index.md');
     expect(result.resolved).toBe(false);

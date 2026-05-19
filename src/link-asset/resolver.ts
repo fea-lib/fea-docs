@@ -17,13 +17,13 @@ export interface LinkResolutionResult {
  */
 export class LinkAssetResolver {
   private graph: DocsGraph;
-  private slugByRelPath: Map<string, string>;
+  private entryIdByRelPath: Map<string, string>;
   private devMode: boolean;
 
   constructor(graph: DocsGraph, devMode = true) {
     this.graph = graph;
     this.devMode = devMode;
-    this.slugByRelPath = new Map(graph.pages.map((p) => [p.relativePath, p.slug]));
+    this.entryIdByRelPath = new Map(graph.pages.map((p) => [p.relativePath, p.entryId]));
   }
 
   /**
@@ -55,8 +55,8 @@ export class LinkAssetResolver {
         .posix
         .normalize(sourceDir === '.' ? hrefPath : `${sourceDir}/${hrefPath}`);
 
-      const slug = this.slugByRelPath.get(resolved);
-      if (!slug) {
+      const entryId = this.entryIdByRelPath.get(resolved);
+      if (!entryId) {
         const diagnostic: Diagnostic = {
           type: this.devMode ? 'warning' : 'error',
           code: 'BROKEN_INTERNAL_LINK',
@@ -66,7 +66,7 @@ export class LinkAssetResolver {
         return { resolved: false, diagnostic };
       }
 
-      const finalHref = fragment ? `/${slug}#${fragment}` : `/${slug}`;
+      const finalHref = fragment ? `/${entryId}/#${fragment}` : `/${entryId}/`;
       return { resolved: true, href: finalHref };
     }
 

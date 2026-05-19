@@ -3,7 +3,7 @@ import type { DocsGraph, NavItem, NavTree } from '../types.js';
 
 interface DirNode {
   label: string;
-  slug?: string;
+  entryId?: string;
   children: Map<string, DirNode>;
   isSectionIndex?: boolean;
 }
@@ -12,7 +12,7 @@ function dirNodeToNavItem(node: DirNode): NavItem {
   const children = Array.from(node.children.values()).map(dirNodeToNavItem);
   return {
     label: node.label,
-    ...(node.slug !== undefined ? { slug: node.slug } : {}),
+    ...(node.entryId !== undefined ? { entryId: node.entryId } : {}),
     ...(children.length > 0 ? { children } : {}),
     ...(node.isSectionIndex ? { isSectionIndex: true } : {}),
   };
@@ -38,13 +38,13 @@ export class NavigationBuilder {
       if (parts.length === 1) {
         // Top-level file
         if (page.isSectionIndex) {
-          current.slug = page.slug;
+          current.entryId = page.entryId;
           current.label = page.label;
           current.isSectionIndex = true;
         } else {
           current.children.set(parts[0], {
             label: page.label,
-            slug: page.slug,
+            entryId: page.entryId,
             children: new Map(),
           });
         }
@@ -66,19 +66,29 @@ export class NavigationBuilder {
       const filename = parts[parts.length - 1];
       if (page.isSectionIndex) {
         // README becomes the index of its parent dir
-        current.slug = page.slug;
+        current.entryId = page.entryId;
         current.label = page.label;
         current.isSectionIndex = true;
       } else {
         current.children.set(filename, {
           label: page.label,
-          slug: page.slug,
+          entryId: page.entryId,
           children: new Map(),
         });
       }
     }
 
-    // Return top-level children as nav tree
-    return Array.from(root.children.values()).map(dirNodeToNavItem);
+    // Return top-level children as nav tree.
+    // If root itself has an entryId it means there was a top-level README —
+    // emit it as the first nav item so it appears in the sidebar.
+    const items = Array.from(root.children.values()).map(dirNodeToNavItem);
+    if (root.entryId !== undefined) {
+      items.unshift({
+        label: root.label || 'Home',
+        entryId: root.entryId,
+        isSectionIndex: true,
+      });
+    }
+    return items;
   }
 }

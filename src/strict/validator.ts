@@ -1,6 +1,6 @@
 import type { DocsGraph, Diagnostic } from '../types.js';
 import { LinkAssetResolver } from '../link-asset/resolver.js';
-import { findDuplicateSlugs } from '../content-graph/parser.js';
+import { findDuplicateEntryIds } from '../content-graph/parser.js';
 
 export interface ValidationResult {
   passed: boolean;
@@ -12,7 +12,7 @@ export interface ValidationResult {
  * Fails on:
  * - Broken internal links
  * - Unresolved assets/images
- * - Duplicate slugs
+ * - Duplicate entry ids (URL collisions)
  * - Missing frontmatter title (when label fallback chain exhausted)
  * - MDX import resolution errors (detected via frontmatter convention)
  */
@@ -21,13 +21,13 @@ export class StrictValidator {
     const diagnostics: Diagnostic[] = [];
     const resolver = new LinkAssetResolver(graph, false); // strict = not dev mode
 
-    // 1. Duplicate slugs
-    const dupes = findDuplicateSlugs(graph.pages);
-    for (const { slug, pages } of dupes) {
+    // 1. Duplicate entry ids (URL collisions)
+    const dupes = findDuplicateEntryIds(graph.pages);
+    for (const { entryId, pages } of dupes) {
       diagnostics.push({
         type: 'error',
         code: 'DUPLICATE_SLUG',
-        message: `Duplicate slug "${slug}" found in: ${pages.map((p) => p.relativePath).join(', ')}`,
+        message: `Duplicate URL path "${entryId}" found in: ${pages.map((p) => p.relativePath).join(', ')}`,
       });
     }
 

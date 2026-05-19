@@ -8,7 +8,6 @@ const DEFAULT_CONFIG: ResolvedConfig = {
   port: 4321,
   open: false,
   strict: false,
-  slugOverrides: {},
   frameworks: [],
   aliases: {},
   tailscaleServe: false,
@@ -60,10 +59,6 @@ export async function resolveConfig(
     aliases: {
       ...(fileConfig.aliases ?? {}),
       ...(cliFlags.aliases ?? {}),
-    },
-    slugOverrides: {
-      ...(fileConfig.slugOverrides ?? {}),
-      ...(cliFlags.slugOverrides ?? {}),
     },
   };
 }
