@@ -4,7 +4,7 @@ title: "Docs App Issue Plan"
 
 ## Source PRD
 
-- Local PRD: `docs/tools/docs-app.prd.md`
+- Local PRD: `1-prd.md`
 - Parent GitHub PRD issue: TBD (needed before creating child issues)
 
 ## Proposed Vertical Slices (Tracer Bullets)
