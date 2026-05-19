@@ -1,3 +1,5 @@
+export type FrameworkAdapter = 'react' | 'vue' | 'svelte' | 'solid' | 'qwik';
+
 /** A single discovered documentation page. */
 export interface DocPage {
   /** Absolute filesystem path to the source file. */
@@ -49,7 +51,7 @@ export interface FeaDocsConfig {
   /** Additional ignore globs on top of defaults. */
   ignore?: string[];
   /** Framework adapters to enable. */
-  frameworks?: Array<'react' | 'vue' | 'svelte' | 'solid'>;
+  frameworks?: FrameworkAdapter[];
   /** Alias import roots for component imports. */
   aliases?: Record<string, string>;
   /** Tailscale serve integration. */
@@ -67,7 +69,7 @@ export interface ResolvedConfig {
   port: number;
   open: boolean;
   strict: boolean;
-  frameworks: Array<'react' | 'vue' | 'svelte' | 'solid'>;
+  frameworks: FrameworkAdapter[];
   aliases: Record<string, string>;
   tailscaleServe: boolean;
   caffeinate: boolean;

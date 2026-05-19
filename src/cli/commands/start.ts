@@ -7,6 +7,7 @@ import { NavigationBuilder } from '../../navigation/builder.js';
 import { RuntimeAdapter } from '../../runtime/adapter.js';
 import { SessionCacheManager } from '../../cache/manager.js';
 import { ensureGitignore } from '../../utils/gitignore.js';
+import { inferFrameworksFromMdxGraph } from '../../mdx-framework/inferer.js';
 import type { ResolvedConfig } from '../../types.js';
 
 export function startCommand(): Command {
@@ -20,7 +21,7 @@ export function startCommand(): Command {
       '--ignore <glob...>',
       'Additional ignore globs',
     )
-    .option('--framework <name...>', 'Enable framework adapters (react, vue, svelte, solid)')
+    .option('--framework <name...>', 'Enable framework adapters (react, vue, svelte, solid, qwik)')
     .option('--tailscale-serve', 'Enable Tailscale serve integration')
     .option('--caffeinate', 'Prevent macOS sleep during session')
     .option('--expose', 'Explicitly consent to remote exposure')
@@ -46,20 +47,37 @@ export function startCommand(): Command {
         const graph = await engine.scan();
         console.log(pc.green(`Found ${graph.pages.length} page(s)`));
 
-        const inferred = await inferConfigFromDocs(
+        const inferredConfig = await inferConfigFromDocs(
           config,
           graph.pages.map((p) => p.relativePath),
         );
-        config.frameworks = inferred.config.frameworks;
-        config.aliases = inferred.config.aliases;
-        if (inferred.sources.length > 0) {
+        config.frameworks = inferredConfig.config.frameworks;
+        config.aliases = inferredConfig.config.aliases;
+        if (inferredConfig.sources.length > 0) {
           console.log(
             pc.cyan(
-              `Inferred framework/alias config from: ${inferred.sources
+              `Merged framework/alias config from: ${inferredConfig.sources
                 .map((s) => s.replace(`${config.root}/`, ''))
                 .join(', ')}`,
             ),
           );
+        }
+
+        const inference = inferFrameworksFromMdxGraph(graph, config.aliases);
+        if (inference.frameworks.length > 0) {
+          const before = new Set(config.frameworks);
+          for (const fw of inference.frameworks) {
+            before.add(fw);
+          }
+          config.frameworks = Array.from(before);
+          console.log(pc.cyan(`Inferred frameworks from MDX imports: ${inference.frameworks.join(', ')}`));
+        }
+
+        for (const diag of inference.diagnostics) {
+          console.warn(pc.yellow(`WARN [${diag.file}] ${diag.message}`));
+        }
+        if (config.strict && inference.diagnostics.length > 0) {
+          throw new Error('Strict mode failed due to unresolved local MDX imports.');
         }
 
         // Build navigation

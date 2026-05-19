@@ -8,6 +8,7 @@ import { RuntimeAdapter } from '../../runtime/adapter.js';
 import { BuildExporter } from '../../build/exporter.js';
 import { StrictValidator } from '../../strict/validator.js';
 import { ensureGitignore } from '../../utils/gitignore.js';
+import { inferFrameworksFromMdxGraph } from '../../mdx-framework/inferer.js';
 import type { ResolvedConfig } from '../../types.js';
 
 export function buildCommand(): Command {
@@ -17,7 +18,7 @@ export function buildCommand(): Command {
     .option('--config <path>', 'Path to an explicit config file')
     .option('--strict', 'Enable strict validation (default in build mode)')
     .option('--ignore <glob...>', 'Additional ignore globs')
-    .option('--framework <name...>', 'Enable framework adapters')
+    .option('--framework <name...>', 'Enable framework adapters (react, vue, svelte, solid, qwik)')
     .action(async (opts) => {
       const cliFlags: Partial<ResolvedConfig> = {
         strict: true, // build always strict
@@ -34,25 +35,44 @@ export function buildCommand(): Command {
         const graph = await engine.scan();
         console.log(pc.green(`Found ${graph.pages.length} page(s)`));
 
-        const inferred = await inferConfigFromDocs(
+        const inferredConfig = await inferConfigFromDocs(
           config,
           graph.pages.map((p) => p.relativePath),
         );
-        config.frameworks = inferred.config.frameworks;
-        config.aliases = inferred.config.aliases;
-        if (inferred.sources.length > 0) {
+        config.frameworks = inferredConfig.config.frameworks;
+        config.aliases = inferredConfig.config.aliases;
+        if (inferredConfig.sources.length > 0) {
           console.log(
             pc.cyan(
-              `Inferred framework/alias config from: ${inferred.sources
+              `Merged framework/alias config from: ${inferredConfig.sources
                 .map((s) => s.replace(`${config.root}/`, ''))
                 .join(', ')}`,
             ),
           );
         }
 
+        const inference = inferFrameworksFromMdxGraph(graph, config.aliases);
+        if (inference.frameworks.length > 0) {
+          const before = new Set(config.frameworks);
+          for (const fw of inference.frameworks) {
+            before.add(fw);
+          }
+          config.frameworks = Array.from(before);
+          console.log(pc.cyan(`Inferred frameworks from MDX imports: ${inference.frameworks.join(', ')}`));
+        }
+
         // Strict validation
         const validator = new StrictValidator();
         const result = validator.validate(graph);
+        result.diagnostics.push(
+          ...inference.diagnostics.map((d) => ({
+            type: 'error' as const,
+            code: d.code,
+            message: d.message,
+            file: d.file,
+          })),
+        );
+        result.passed = result.passed && inference.diagnostics.length === 0;
 
         for (const diag of result.diagnostics) {
           const prefix = diag.type === 'error' ? pc.red('ERROR') : pc.yellow('WARN');

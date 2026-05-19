@@ -89,6 +89,9 @@ export class RuntimeAdapter {
       } else if (fw === 'solid') {
         deps['@astrojs/solid-js'] = '^6.0.1';
         deps['solid-js'] = '^1.9.0';
+      } else if (fw === 'qwik') {
+        deps['@qwikdev/astro'] = '^0.8.3';
+        deps['@builder.io/qwik'] = '^1.19.2';
       }
     }
     return deps;
@@ -143,6 +146,7 @@ export class RuntimeAdapter {
           vue: `import vue from '@astrojs/vue';`,
           svelte: `import svelte from '@astrojs/svelte';`,
           solid: `import solidJs from '@astrojs/solid-js';`,
+          qwik: `import qwikdev from '@qwikdev/astro';`,
         };
         return map[fw] ?? '';
       })
@@ -156,6 +160,7 @@ export class RuntimeAdapter {
           vue: 'vue()',
           svelte: 'svelte()',
           solid: 'solidJs()',
+          qwik: 'qwikdev()',
         };
         return map[fw] ?? '';
       })

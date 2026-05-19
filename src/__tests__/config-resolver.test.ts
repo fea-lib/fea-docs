@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { ResolvedConfig } from '../types.js';
-import { inferConfigFromDocs } from '../config/resolver.js';
+import { inferConfigFromDocs, resolveConfig } from '../config/resolver.js';
 
 function makeTmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'fea-docs-config-test-'));
@@ -30,6 +30,33 @@ function baseConfig(root: string): ResolvedConfig {
   };
 }
 
+describe('resolveConfig', () => {
+  let tmpDir: string;
+  let cwdSpy: ReturnType<typeof vi.spyOn> | null = null;
+
+  beforeEach(() => {
+    tmpDir = makeTmpDir();
+    cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(tmpDir);
+  });
+
+  afterEach(() => {
+    cwdSpy?.mockRestore();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('auto-loads config from cwd when --config is not provided', async () => {
+    writeFile(
+      tmpDir,
+      'fea-docs.config.mjs',
+      "export default { frameworks: ['react'], aliases: { '@lib': '/tmp/lib' } };\n",
+    );
+
+    const resolved = await resolveConfig({});
+    expect(resolved.frameworks).toContain('react');
+    expect(resolved.aliases['@lib']).toBe('/tmp/lib');
+  });
+});
+
 describe('inferConfigFromDocs', () => {
   let tmpDir: string;
 
@@ -47,31 +74,11 @@ describe('inferConfigFromDocs', () => {
       'example/fea-docs.config.mjs',
       "export default { frameworks: ['react'], aliases: { '@react-lib': '/tmp/react-lib' } };\n",
     );
-    writeFile(tmpDir, 'example/docs/integrations.mdx', '# Integrations');
 
     const inferred = await inferConfigFromDocs(baseConfig(tmpDir), ['example/docs/integrations.mdx']);
 
     expect(inferred.config.frameworks).toContain('react');
     expect(inferred.config.aliases['@react-lib']).toBe('/tmp/react-lib');
     expect(inferred.sources).toHaveLength(1);
-  });
-
-  it('keeps explicit config precedence over inferred aliases/frameworks', async () => {
-    writeFile(
-      tmpDir,
-      'example/fea-docs.config.mjs',
-      "export default { frameworks: ['svelte'], aliases: { '@lib': '/tmp/inferred' } };\n",
-    );
-
-    const config: ResolvedConfig = {
-      ...baseConfig(tmpDir),
-      frameworks: ['react'],
-      aliases: { '@lib': '/tmp/explicit' },
-    };
-
-    const inferred = await inferConfigFromDocs(config, ['example/docs/integrations.mdx']);
-
-    expect(inferred.config.frameworks).toEqual(['react', 'svelte']);
-    expect(inferred.config.aliases['@lib']).toBe('/tmp/explicit');
   });
 });

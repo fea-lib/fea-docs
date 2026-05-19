@@ -3,6 +3,15 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { ResolvedConfig } from '../types.js';
 
+const CONFIG_CANDIDATES = [
+  'fea-docs.config.mjs',
+  'fea-docs.config.js',
+  'fea-docs.config.cjs',
+  'fea-docs.config.ts',
+];
+
+const SUPPORTED_FRAMEWORKS = new Set(['react', 'vue', 'svelte', 'solid', 'qwik']);
+
 const DEFAULT_CONFIG: ResolvedConfig = {
   root: process.cwd(),
   ignore: [],
@@ -26,7 +35,7 @@ export async function resolveConfig(
 ): Promise<ResolvedConfig> {
   let fileConfig: Partial<ResolvedConfig> = {};
 
-  const configPath = configFilePath ?? null;
+  const configPath = configFilePath ?? findConfigInCwd();
 
   if (configPath) {
     if (!fs.existsSync(configPath)) {
@@ -64,14 +73,15 @@ export async function resolveConfig(
   };
 }
 
-const CONFIG_CANDIDATES = [
-  'fea-docs.config.mjs',
-  'fea-docs.config.js',
-  'fea-docs.config.cjs',
-  'fea-docs.config.ts',
-];
-
-const SUPPORTED_FRAMEWORKS = new Set(['react', 'vue', 'svelte', 'solid']);
+function findConfigInCwd(cwd = process.cwd()): string | null {
+  for (const name of CONFIG_CANDIDATES) {
+    const candidate = path.join(cwd, name);
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
 
 interface InferredConfigResult {
   config: ResolvedConfig;
@@ -79,9 +89,8 @@ interface InferredConfigResult {
 }
 
 /**
- * Infer framework/alias config from nested docs workspaces.
- * This helps monorepo-style roots render MDX imports in subtrees that have
- * their own `fea-docs.config.*` file (e.g. ./example).
+ * Infer additional framework and alias config from docs subtrees.
+ * Explicit CLI/CWD config remains authoritative.
  */
 export async function inferConfigFromDocs(
   config: ResolvedConfig,
