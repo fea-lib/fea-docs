@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const exampleDir = path.resolve(__dirname, '..');
+const exampleDir = path.resolve(__dirname, '.');
 
 /** @type {import('fea-docs').FeaDocsConfig} */
 export default {

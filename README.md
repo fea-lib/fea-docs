@@ -79,6 +79,15 @@ During the scan phase, any file missing a frontmatter `title` has one injected a
 
 The `.fea-docs/` directory should be gitignored. A session cache fingerprints your config so subsequent runs skip the install step.
 
+## Example
+
+The [`example/`](./example/) directory contains a minimal repository you can use to try fea-docs locally:
+
+```sh
+cd example
+npx fea-docs start
+```
+
 ## Requirements
 
 - Node.js 18 or later

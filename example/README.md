@@ -11,9 +11,9 @@ component libraries co-located alongside this docs directory:
 
 | Library | Path | Framework |
 |---|---|---|
-| React TS | `../react-lib/` | React + TypeScript |
-| Svelte JS | `../svelte-lib/` | Svelte (JS) |
-| Astro TS | `../astro-lib/` | Astro + TypeScript |
+| React TS | `react-lib/` | React + TypeScript |
+| Svelte JS | `svelte-lib/` | Svelte (JS) |
+| Astro TS | `astro-lib/` | Astro + TypeScript |
 
 ## Start
 
