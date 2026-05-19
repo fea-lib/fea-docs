@@ -21,32 +21,33 @@ export class SessionCacheManager {
     this.cachePath = path.join(this.cacheDir, 'session.json');
   }
 
-  private fingerprint(config: ResolvedConfig): string {
+  private fingerprint(config: ResolvedConfig, pages: string[] = []): string {
     const sig = JSON.stringify({
       root: config.root,
       ignore: config.ignore,
       frameworks: config.frameworks,
       aliases: config.aliases,
+      pages: [...pages].sort(),
     });
     return crypto.createHash('sha256').update(sig).digest('hex');
   }
 
-  /** Returns true if the config matches the cached fingerprint. */
-  isValid(config: ResolvedConfig): boolean {
+  /** Returns true if the config and page list match the cached fingerprint. */
+  isValid(config: ResolvedConfig, pages: string[] = []): boolean {
     if (!fs.existsSync(this.cachePath)) return false;
     try {
       const entry: CacheEntry = JSON.parse(fs.readFileSync(this.cachePath, 'utf-8'));
-      return entry.fingerprint === this.fingerprint(config);
+      return entry.fingerprint === this.fingerprint(config, pages);
     } catch {
       return false;
     }
   }
 
   /** Persist the current config fingerprint. */
-  save(config: ResolvedConfig): void {
+  save(config: ResolvedConfig, pages: string[] = []): void {
     fs.mkdirSync(this.cacheDir, { recursive: true });
     const entry: CacheEntry = {
-      fingerprint: this.fingerprint(config),
+      fingerprint: this.fingerprint(config, pages),
       createdAt: Date.now(),
     };
     fs.writeFileSync(this.cachePath, JSON.stringify(entry, null, 2));

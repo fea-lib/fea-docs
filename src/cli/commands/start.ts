@@ -51,8 +51,9 @@ export function startCommand(): Command {
         const navTree = navBuilder.build(graph);
 
         // Session cache
+        const pageRelPaths = graph.pages.map((p) => p.relativePath);
         const cache = new SessionCacheManager(config.root);
-        const cacheHit = cache.isValid(config);
+        const cacheHit = cache.isValid(config, pageRelPaths);
 
         // Materialize Starlight app
         const adapter = new RuntimeAdapter({ config, graph, navTree });
@@ -60,7 +61,7 @@ export function startCommand(): Command {
           console.log(pc.cyan('Preparing Starlight runtime...'));
           ensureGitignore(config.root);
           await adapter.materialize();
-          cache.save(config);
+          cache.save(config, pageRelPaths);
         }
 
         // Platform features

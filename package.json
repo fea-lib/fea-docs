@@ -1,6 +1,6 @@
 {
   "name": "fea-docs",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Zero-config Starlight docs from any directory",
   "type": "module",
   "bin": {
