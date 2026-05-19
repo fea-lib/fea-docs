@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import type { ResolvedConfig } from '../types.js';
 
 const DEFAULT_CONFIG: ResolvedConfig = {
@@ -60,5 +61,89 @@ export async function resolveConfig(
       ...(fileConfig.aliases ?? {}),
       ...(cliFlags.aliases ?? {}),
     },
+  };
+}
+
+const CONFIG_CANDIDATES = [
+  'fea-docs.config.mjs',
+  'fea-docs.config.js',
+  'fea-docs.config.cjs',
+  'fea-docs.config.ts',
+];
+
+const SUPPORTED_FRAMEWORKS = new Set(['react', 'vue', 'svelte', 'solid']);
+
+interface InferredConfigResult {
+  config: ResolvedConfig;
+  sources: string[];
+}
+
+/**
+ * Infer framework/alias config from nested docs workspaces.
+ * This helps monorepo-style roots render MDX imports in subtrees that have
+ * their own `fea-docs.config.*` file (e.g. ./example).
+ */
+export async function inferConfigFromDocs(
+  config: ResolvedConfig,
+  relativeDocPaths: string[],
+): Promise<InferredConfigResult> {
+  const root = path.resolve(config.root);
+  const candidateDirs = new Set<string>();
+
+  for (const relPath of relativeDocPaths) {
+    let dir = path.resolve(root, path.dirname(relPath));
+    while (true) {
+      candidateDirs.add(dir);
+      if (dir === root) break;
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  }
+
+  const discoveredConfigs = new Set<string>();
+  for (const dir of candidateDirs) {
+    for (const name of CONFIG_CANDIDATES) {
+      const candidatePath = path.join(dir, name);
+      if (fs.existsSync(candidatePath)) {
+        discoveredConfigs.add(candidatePath);
+        break;
+      }
+    }
+  }
+
+  if (discoveredConfigs.size === 0) {
+    return { config, sources: [] };
+  }
+
+  const inferredFrameworks = [...config.frameworks];
+  const inferredAliases = { ...config.aliases };
+  const sources = Array.from(discoveredConfigs).sort((a, b) => a.length - b.length);
+
+  for (const source of sources) {
+    const raw = await import(pathToFileURL(source).href);
+    const fromFile = (raw.default ?? raw) as Partial<ResolvedConfig>;
+
+    for (const fw of fromFile.frameworks ?? []) {
+      if (!SUPPORTED_FRAMEWORKS.has(fw)) continue;
+      if (!inferredFrameworks.includes(fw)) {
+        inferredFrameworks.push(fw);
+      }
+    }
+
+    for (const [aliasKey, aliasPath] of Object.entries(fromFile.aliases ?? {})) {
+      if (!(aliasKey in inferredAliases)) {
+        inferredAliases[aliasKey] = aliasPath;
+      }
+    }
+  }
+
+  return {
+    config: {
+      ...config,
+      frameworks: inferredFrameworks,
+      aliases: inferredAliases,
+    },
+    sources,
   };
 }

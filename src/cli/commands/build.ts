@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import pc from 'picocolors';
 import path from 'node:path';
-import { resolveConfig } from '../../config/resolver.js';
+import { inferConfigFromDocs, resolveConfig } from '../../config/resolver.js';
 import { ContentGraphEngine } from '../../content-graph/engine.js';
 import { NavigationBuilder } from '../../navigation/builder.js';
 import { RuntimeAdapter } from '../../runtime/adapter.js';
@@ -33,6 +33,22 @@ export function buildCommand(): Command {
         const engine = new ContentGraphEngine(config);
         const graph = await engine.scan();
         console.log(pc.green(`Found ${graph.pages.length} page(s)`));
+
+        const inferred = await inferConfigFromDocs(
+          config,
+          graph.pages.map((p) => p.relativePath),
+        );
+        config.frameworks = inferred.config.frameworks;
+        config.aliases = inferred.config.aliases;
+        if (inferred.sources.length > 0) {
+          console.log(
+            pc.cyan(
+              `Inferred framework/alias config from: ${inferred.sources
+                .map((s) => s.replace(`${config.root}/`, ''))
+                .join(', ')}`,
+            ),
+          );
+        }
 
         // Strict validation
         const validator = new StrictValidator();
