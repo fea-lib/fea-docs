@@ -1,6 +1,6 @@
 {
   "name": "fea-docs",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Zero-config Starlight docs from any directory",
   "type": "module",
   "bin": {
@@ -51,5 +51,9 @@
     "markdown",
     "documentation"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fea-lib/fea-docs.git"
+  }
 }
