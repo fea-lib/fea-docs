@@ -43,6 +43,13 @@ export class RuntimeAdapter {
     await this.installDeps();
   }
 
+  /** Ensure framework/runtime dependencies are installed for the current config. */
+  async ensureDependencies(): Promise<void> {
+    fs.mkdirSync(this.projectDir, { recursive: true });
+    await this.writePackageJson();
+    await this.installDeps();
+  }
+
   private async writePackageJson(): Promise<void> {
     const pkg = {
       name: 'fea-docs-app',
@@ -93,20 +100,30 @@ export class RuntimeAdapter {
 
   /**
    * Convert our NavTree into Starlight's sidebar format.
-   * Leaf: { label, link }  — `link` is the Starlight entry-id URL
-   * Group: { label, items } — recursively converted children
+   * Leaf: { slug } when pointing to docs content.
+   * Group: { label, items }.
+   *
+   * For section indexes (README with children), Starlight does not accept
+   * `{ label, link, items }`. We represent the section index as the first child
+   * item using `{ slug }` inside the group's `items` array.
    */
   private navItemToStarlight(item: NavItem): unknown {
     if (item.children && item.children.length > 0) {
+      const items = item.children.map((c) => this.navItemToStarlight(c));
+      if (item.entryId !== undefined) {
+        items.unshift({ slug: item.entryId });
+      }
       return {
         label: item.label,
-        ...(item.entryId !== undefined ? { link: this.entryIdToLink(item.entryId) } : {}),
-        items: item.children.map((c) => this.navItemToStarlight(c)),
+        items,
       };
+    }
+    if (item.entryId !== undefined) {
+      return { slug: item.entryId };
     }
     return {
       label: item.label,
-      link: item.entryId !== undefined ? this.entryIdToLink(item.entryId) : '/',
+      link: '/',
     };
   }
 
@@ -176,6 +193,7 @@ export default defineConfig({
       fs: {
         allow: [${JSON.stringify(this.projectDir)}, ${JSON.stringify(path.join(this.workdir, 'content-stage'))}],
       },
+      ${config.expose || config.tailscaleServe ? 'allowedHosts: true,' : ''}
     },
   },
   server: {
@@ -373,13 +391,10 @@ export const collections = {
   }
 
   private async installDeps(): Promise<void> {
-    const lockFile = path.join(this.projectDir, 'node_modules', '.package-lock.json');
-    if (!fs.existsSync(lockFile)) {
-      execSync('npm install --prefer-offline --loglevel=warn', {
-        cwd: this.projectDir,
-        stdio: 'pipe',
-      });
-    }
+    execSync('npm install --prefer-offline --loglevel=warn', {
+      cwd: this.projectDir,
+      stdio: 'pipe',
+    });
   }
 
   /** Start the Astro dev server. Returns the port it started on. */

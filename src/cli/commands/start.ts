@@ -57,12 +57,10 @@ export function startCommand(): Command {
 
         // Materialize Starlight app
         const adapter = new RuntimeAdapter({ config, graph, navTree });
-        if (!cacheHit) {
-          console.log(pc.cyan('Preparing Starlight runtime...'));
-          ensureGitignore(config.root);
-          await adapter.materialize();
-          cache.save(config, pageRelPaths);
-        }
+        console.log(pc.cyan(cacheHit ? 'Refreshing Starlight runtime...' : 'Preparing Starlight runtime...'));
+        ensureGitignore(config.root);
+        await adapter.materialize();
+        cache.save(config, pageRelPaths);
 
         // Platform features
         if (opts.caffeinate) {
@@ -122,7 +120,7 @@ function startCaffeinate(): void {
 
 function startTailscaleServe(port: number): void {
   try {
-    execSync(`tailscale serve --bg http://localhost:${port}`, { stdio: 'inherit' });
+    execSync(`tailscale serve --bg --https=${port} http://localhost:${port}`, { stdio: 'inherit' });
   } catch {
     console.warn(pc.yellow('Warning: tailscale serve failed. Is Tailscale installed?'));
   }

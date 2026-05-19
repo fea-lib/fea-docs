@@ -51,6 +51,9 @@ npx fea-docs@latest start --tailscale-serve --expose
 
 # Prevent macOS sleep during a long session
 npx fea-docs@latest start --caffeinate
+
+# Use both together (macOS + Tailscale sharing)
+npx fea-docs@latest start --caffeinate --tailscale-serve --expose
 ```
 
 ### Port precedence
