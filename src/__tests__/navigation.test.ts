@@ -73,4 +73,19 @@ describe('NavigationBuilder', () => {
     expect(nav[0].isSectionIndex).toBe(true);
     expect(nav[0].children).toHaveLength(1);
   });
+
+  it('ignores dot-prefixed files and directories in nav generation', () => {
+    const graph = makeGraph([
+      { rel: '.abc/LICENSE.md', label: 'License', slug: '.abc/license' },
+      { rel: 'guide/.private.md', label: 'Private', slug: 'guide/.private' },
+      { rel: 'guide/intro.md', label: 'Intro', slug: 'guide/intro' },
+    ]);
+    const builder = new NavigationBuilder();
+    const nav = builder.build(graph);
+
+    expect(nav).toHaveLength(1);
+    expect(nav[0].label).toBe('guide');
+    expect(nav[0].children).toHaveLength(1);
+    expect(nav[0].children?.[0]?.entryId).toBe('guide/intro');
+  });
 });

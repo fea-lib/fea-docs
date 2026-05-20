@@ -1,10 +1,27 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync, spawn, type ChildProcess } from 'node:child_process';
-import os from 'node:os';
 import type { DocsGraph, NavItem, NavTree, ResolvedConfig } from '../types.js';
 
 const WORKDIR_NAME = '.fea-docs';
+
+// Keep runtime content-loader discovery aligned with ContentGraphEngine:
+// include hidden dot-prefixed files/dirs by default, then rely on
+// .gitignore and user-configured ignore rules for exclusions.
+export const CONTENT_GLOB_PATTERNS = [
+  '**/*.{md,mdx}',
+  '**/.*/**/*.{md,mdx}',
+  '**/.*.{md,mdx}',
+  '!**/node_modules/**',
+];
+
+const NAV_ENTRY_NOT_FOUND_ENTRY_ID = '__fea-docs/nav-entry-not-found';
+
+export interface NavVerificationIssue {
+  label: string;
+  entryId: string;
+  navPath: string;
+}
 
 export interface RuntimeAdapterOptions {
   config: ResolvedConfig;
@@ -20,10 +37,14 @@ export class RuntimeAdapter {
   private options: RuntimeAdapterOptions;
   private workdir: string;
   private devProcess: ChildProcess | null = null;
+  private readonly availableEntryIds: Set<string>;
+  private navVerificationIssues: NavVerificationIssue[] = [];
+  private navVerificationIssueKeys = new Set<string>();
 
   constructor(options: RuntimeAdapterOptions) {
     this.options = options;
     this.workdir = path.join(options.config.root, WORKDIR_NAME);
+    this.availableEntryIds = new Set(options.graph.pages.map((p) => p.entryId));
   }
 
   /** Return path to the ephemeral Starlight project. */
@@ -97,8 +118,39 @@ export class RuntimeAdapter {
     return deps;
   }
 
-  private entryIdToLink(entryId: string): string {
-    return `/${entryId}/`;
+  getNavVerificationIssues(): NavVerificationIssue[] {
+    return [...this.navVerificationIssues];
+  }
+
+  private navEntryNotFoundLink(entryId: string, label: string): string {
+    const params = new URLSearchParams({ missing: entryId, label });
+    return `/${NAV_ENTRY_NOT_FOUND_ENTRY_ID}/?${params.toString()}`;
+  }
+
+  private recordMissingNavEntry(entryId: string, label: string, navPath: string): void {
+    const key = `${entryId}|${label}|${navPath}`;
+    if (this.navVerificationIssueKeys.has(key)) return;
+    this.navVerificationIssueKeys.add(key);
+    this.navVerificationIssues.push({ entryId, label, navPath });
+  }
+
+  private missingEntrySidebarLink(entryId: string, label: string, navPath: string): Record<string, unknown> {
+    this.recordMissingNavEntry(entryId, label, navPath);
+    return {
+      label,
+      link: this.navEntryNotFoundLink(entryId, label),
+      badge: {
+        text: 'Missing',
+        variant: 'caution',
+      },
+      attrs: {
+        title: `Missing entry id: ${entryId}`,
+      },
+    };
+  }
+
+  private hasEntryId(entryId: string): boolean {
+    return this.availableEntryIds.has(entryId) || entryId === NAV_ENTRY_NOT_FOUND_ENTRY_ID;
   }
 
   /**
@@ -110,11 +162,16 @@ export class RuntimeAdapter {
    * `{ label, link, items }`. We represent the section index as the first child
    * item using `{ slug }` inside the group's `items` array.
    */
-  private navItemToStarlight(item: NavItem): unknown {
+  private navItemToStarlight(item: NavItem, pathParts: string[]): unknown {
+    const navPath = pathParts.join(' > ');
     if (item.children && item.children.length > 0) {
-      const items = item.children.map((c) => this.navItemToStarlight(c));
+      const items = item.children.map((c) => this.navItemToStarlight(c, [...pathParts, c.label]));
       if (item.entryId !== undefined) {
-        items.unshift({ slug: item.entryId });
+        if (this.hasEntryId(item.entryId)) {
+          items.unshift({ slug: item.entryId });
+        } else {
+          items.unshift(this.missingEntrySidebarLink(item.entryId, item.label, navPath));
+        }
       }
       return {
         label: item.label,
@@ -122,6 +179,9 @@ export class RuntimeAdapter {
       };
     }
     if (item.entryId !== undefined) {
+      if (!this.hasEntryId(item.entryId)) {
+        return this.missingEntrySidebarLink(item.entryId, item.label, navPath);
+      }
       return { slug: item.entryId };
     }
     return {
@@ -131,7 +191,9 @@ export class RuntimeAdapter {
   }
 
   private navTreeToStarlightConfig(navTree: NavTree): string {
-    const sidebar = navTree.map((item) => this.navItemToStarlight(item));
+    this.navVerificationIssues = [];
+    this.navVerificationIssueKeys = new Set<string>();
+    const sidebar = navTree.map((item) => this.navItemToStarlight(item, [item.label]));
     return JSON.stringify(sidebar, null, 2);
   }
 
@@ -342,6 +404,8 @@ export default function remarkStripLeadH1() {
       fs.symlinkSync(page.absolutePath, destPath, 'file');
     }
 
+    this.writeNavEntryNotFoundPage();
+
     // Point src/content/docs at the staging dir
     fs.rmSync(contentDir, { recursive: true, force: true });
     fs.mkdirSync(contentParent, { recursive: true });
@@ -351,6 +415,42 @@ export default function remarkStripLeadH1() {
     // A top-level README gets slug '' but Starlight serves it at /readme/,
     // not /, so we can never rely on Starlight to handle the root URL itself.
     this.writeIndexRedirect();
+  }
+
+  private writeNavEntryNotFoundPage(): void {
+    const destPath = path.join(this.projectDir, 'src', 'pages', '__fea-docs', 'nav-entry-not-found', 'index.astro');
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+
+    const content = `---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+
+const missing = Astro.url.searchParams.get('missing') ?? 'unknown-entry-id';
+const label = Astro.url.searchParams.get('label') ?? 'Unknown item';
+---
+
+<StarlightPage frontmatter={{ title: 'Entry Not Found' }}>
+  <h1>Entry Not Found</h1>
+  <p>
+    This sidebar item points to an entry id that is not available in the docs collection.
+  </p>
+
+  <div class="sl-markdown-content">
+    <p><strong>Sidebar label:</strong> <code>{label}</code></p>
+    <p><strong>Missing entry id:</strong> <code>{missing}</code></p>
+  </div>
+
+  <p>
+    This can happen when a page is excluded by <code>.gitignore</code> or your <code>ignore</code>
+    config, or when a sidebar entry id no longer matches a loaded docs page.
+  </p>
+
+  <p>
+    <a href="/">Go to docs home</a> · <a href="/readme/">Open README</a>
+  </p>
+</StarlightPage>
+`;
+
+    fs.writeFileSync(destPath, content);
   }
 
   private writeIndexRedirect(): void {
@@ -377,6 +477,7 @@ export default function remarkStripLeadH1() {
    * because parseDocFile injects one if missing during the scan phase.
    */
   private async writeContentConfig(): Promise<void> {
+    const pattern = JSON.stringify(CONTENT_GLOB_PATTERNS, null, 6).replace(/\n/g, '\n      ');
     const config = `\
 import { defineCollection } from 'astro:content';
 import { glob } from 'astro/loaders';
@@ -386,7 +487,7 @@ export const collections = {
   docs: defineCollection({
     loader: glob({
       base: 'src/content/docs',
-      pattern: ['**/[^_]*.{md,mdx}', '!**/node_modules/**'],
+      pattern: ${pattern},
     }),
     schema: docsSchema(),
   }),

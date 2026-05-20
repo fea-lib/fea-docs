@@ -10,6 +10,24 @@ import { ensureGitignore } from '../../utils/gitignore.js';
 import { inferFrameworksFromMdxGraph } from '../../mdx-framework/inferer.js';
 import type { ResolvedConfig } from '../../types.js';
 
+function logNavVerificationWarnings(adapter: RuntimeAdapter): void {
+  const issues = adapter.getNavVerificationIssues();
+  if (issues.length === 0) return;
+
+  console.warn(
+    pc.yellow(
+      `WARN [NAV_ENTRY_NOT_FOUND] ${issues.length} sidebar entr${issues.length === 1 ? 'y is' : 'ies are'} pointing to missing entry ids. Redirecting to the entry-not-found page.`,
+    ),
+  );
+  for (const issue of issues) {
+    console.warn(
+      pc.yellow(
+        `  - ${issue.navPath}: "${issue.label}" -> "${issue.entryId}"`,
+      ),
+    );
+  }
+}
+
 export function startCommand(): Command {
   return new Command('start')
     .description('Start a local Starlight docs preview from the current directory')
@@ -94,6 +112,7 @@ export function startCommand(): Command {
         console.log(pc.cyan(cacheHit ? 'Refreshing Starlight runtime...' : 'Preparing Starlight runtime...'));
         ensureGitignore(config.root);
         await adapter.materialize();
+        logNavVerificationWarnings(adapter);
         cache.save(config, pageRelPaths);
 
         // Platform features
