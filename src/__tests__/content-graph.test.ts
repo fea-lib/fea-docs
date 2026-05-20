@@ -137,6 +137,36 @@ describe('ContentGraphEngine', () => {
 
     expect(graph.pages[0].entryId).toBe('my page');
   });
+
+  it('normalizes nested index.md to parent entryId', async () => {
+    writeFile(tmpDir, 'example/docs/index.md', '# Example docs index');
+
+    const engine = new ContentGraphEngine({ root: tmpDir, ignore: [] });
+    const graph = await engine.scan();
+
+    expect(graph.pages).toHaveLength(1);
+    expect(graph.pages[0].entryId).toBe('example/docs');
+  });
+
+  it('normalizes nested index.mdx to parent entryId', async () => {
+    writeFile(tmpDir, 'example/docs/index.mdx', '# Example docs index');
+
+    const engine = new ContentGraphEngine({ root: tmpDir, ignore: [] });
+    const graph = await engine.scan();
+
+    expect(graph.pages).toHaveLength(1);
+    expect(graph.pages[0].entryId).toBe('example/docs');
+  });
+
+  it('normalizes top-level index.md to empty entryId', async () => {
+    writeFile(tmpDir, 'index.md', '# Home');
+
+    const engine = new ContentGraphEngine({ root: tmpDir, ignore: [] });
+    const graph = await engine.scan();
+
+    expect(graph.pages).toHaveLength(1);
+    expect(graph.pages[0].entryId).toBe('');
+  });
 });
 
 describe('injectFrontmatterTitle', () => {

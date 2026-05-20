@@ -83,10 +83,16 @@ export function parseDocFile(absolutePath: string, relativePath: string): DocPag
 
   const label = deriveLabel(frontmatter, content, relativePath);
   // entryId: what Starlight's Content Layer glob() loader uses as the URL path.
-  const entryId = relativePath
+  // Starlight treats index.md(x) as its parent path (e.g. guide/index.md -> guide).
+  let entryId = relativePath
     .replace(/\\/g, '/')
     .replace(/\.(md|mdx)$/, '')
     .toLowerCase();
+  if (entryId.endsWith('/index')) {
+    entryId = entryId.slice(0, -('/index'.length));
+  } else if (entryId === 'index') {
+    entryId = '';
+  }
 
   raw = injectFrontmatterTitle(absolutePath, raw, label);
   const updatedFrontmatter = matter(raw).data;
