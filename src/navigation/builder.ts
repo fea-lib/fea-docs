@@ -32,11 +32,6 @@ export class NavigationBuilder {
     };
 
     for (const page of graph.pages) {
-      const pathParts = page.relativePath.replace(/\\/g, '/').split('/');
-      if (pathParts.some((part) => part.startsWith('.'))) {
-        continue;
-      }
-
       const parts = page.relativePath.replace(/\\/g, '/').split('/');
       let current = root;
 

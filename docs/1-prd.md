@@ -81,7 +81,7 @@ The CLI also supports static build output (`build`) and one-command GitHub Pages
 - Default discovery scope is the current working directory subtree only.
 - Discovery includes all Markdown and MDX files recursively.
 - Discovery excludes paths from `.gitignore`, default technical ignore list, and user-defined ignore globs.
-- Navigation generation ignores dot-prefixed files/directories by default because Astro's content `glob()` loader does not reliably surface dot-path entries as valid Starlight sidebar slugs.
+- Dot-prefixed files/directories are excluded by default at discovery time, so they are ignored consistently across scanning, frontmatter injection, navigation, and runtime generation.
 - Navigation model mirrors source directory hierarchy.
 - Section index behavior maps directory `README` files to directory landing pages.
 - Navigation labels resolve by priority: frontmatter `title`, first H1, then filename.

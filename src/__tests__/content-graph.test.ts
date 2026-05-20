@@ -49,6 +49,17 @@ describe('ContentGraphEngine', () => {
     expect(graph.pages[0].relativePath).toBe('index.md');
   });
 
+  it('excludes dot-prefixed directories by default', async () => {
+    writeFile(tmpDir, 'index.md', '# Index');
+    writeFile(tmpDir, '.abc/license.md', '# License');
+
+    const engine = new ContentGraphEngine({ root: tmpDir, ignore: [], slugOverrides: {} });
+    const graph = await engine.scan();
+
+    expect(graph.pages).toHaveLength(1);
+    expect(graph.pages[0].relativePath).toBe('index.md');
+  });
+
   it('respects .gitignore exclusions', async () => {
     writeFile(tmpDir, 'index.md', '# Index');
     writeFile(tmpDir, 'private/secret.md', '# Secret');

@@ -18,6 +18,8 @@ export const DEFAULT_IGNORE_GLOBS: string[] = [
   '**/.nyc_output/**',
   // Version control
   '**/.git/**',
+  // Hidden directories (must be ignored consistently across all processing)
+  '**/.*/**',
   // Package manager artifacts
   '**/.yarn/**',
   '**/.pnpm-store/**',
