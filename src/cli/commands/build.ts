@@ -3,36 +3,16 @@ import pc from 'picocolors';
 import path from 'node:path';
 import { inferConfigFromDocs, resolveConfig } from '../../config/resolver.js';
 import { ContentGraphEngine } from '../../content-graph/engine.js';
-import { NavigationBuilder } from '../../navigation/builder.js';
 import { RuntimeAdapter } from '../../runtime/adapter.js';
-import { BuildExporter } from '../../build/exporter.js';
 import { StrictValidator } from '../../strict/validator.js';
-import { ensureGitignore } from '../../utils/gitignore.js';
 import { inferFrameworksFromMdxGraph } from '../../mdx-framework/inferer.js';
 import type { ResolvedConfig } from '../../types.js';
-
-function logNavVerificationWarnings(adapter: RuntimeAdapter): void {
-  const issues = adapter.getNavVerificationIssues();
-  if (issues.length === 0) return;
-
-  console.warn(
-    pc.yellow(
-      `WARN [NAV_ENTRY_NOT_FOUND] ${issues.length} sidebar entr${issues.length === 1 ? 'y is' : 'ies are'} pointing to missing entry ids. Redirecting to the entry-not-found page.`,
-    ),
-  );
-  for (const issue of issues) {
-    console.warn(
-      pc.yellow(
-        `  - ${issue.navPath}: "${issue.label}" -> "${issue.entryId}"`,
-      ),
-    );
-  }
-}
 
 export function buildCommand(): Command {
   return new Command('build')
     .description('Generate deployable static docs output')
     .option('--out-dir <path>', 'Output directory', 'dist')
+    .option('--name <text>', 'Custom docs site name/title')
     .option('--config <path>', 'Path to an explicit config file')
     .option('--strict', 'Enable strict validation (default in build mode)')
     .option('--ignore <glob...>', 'Additional ignore globs')
@@ -40,6 +20,7 @@ export function buildCommand(): Command {
     .action(async (opts) => {
       const cliFlags: Partial<ResolvedConfig> = {
         strict: true, // build always strict
+        ...(opts.name ? { name: String(opts.name) } : {}),
         ...(opts.ignore ? { ignore: opts.ignore } : {}),
         ...(opts.framework ? { frameworks: opts.framework } : {}),
       };
@@ -103,22 +84,14 @@ export function buildCommand(): Command {
           process.exit(1);
         }
 
-        const navBuilder = new NavigationBuilder();
-        const navTree = navBuilder.build(graph);
-
-        const adapter = new RuntimeAdapter({ config, graph, navTree });
+        const adapter = new RuntimeAdapter({ config, graph });
         console.log(pc.cyan('Preparing Starlight runtime...'));
-        ensureGitignore(config.root);
         await adapter.materialize();
-        logNavVerificationWarnings(adapter);
+        console.log(pc.cyan(`Runtime cache dir: ${adapter.runtimeDir}`));
 
         const outDir = path.resolve(opts.outDir);
         console.log(pc.cyan(`Building to ${outDir}...`));
         await adapter.runBuild(outDir);
-
-        // Copy static assets
-        const exporter = new BuildExporter({ graph, outputDir: outDir });
-        await exporter.copyAssets();
 
         console.log(pc.green(`\nBuild complete: ${outDir}`));
       } catch (err) {

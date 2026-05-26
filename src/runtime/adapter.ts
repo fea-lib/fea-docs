@@ -1,9 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync, spawn, type ChildProcess } from 'node:child_process';
-import type { DocsGraph, NavItem, NavTree, ResolvedConfig } from '../types.js';
-
-const WORKDIR_NAME = '.fea-docs';
+import type { DocsGraph, ResolvedConfig } from '../types.js';
+import { feaDocsWorkspaceCacheDir } from '../utils/cache-dir.js';
 
 // Keep runtime content-loader discovery aligned with ContentGraphEngine:
 // include hidden dot-prefixed files/dirs by default, then rely on
@@ -15,18 +14,9 @@ export const CONTENT_GLOB_PATTERNS = [
   '!**/node_modules/**',
 ];
 
-const NAV_ENTRY_NOT_FOUND_ENTRY_ID = '__fea-docs/nav-entry-not-found';
-
-export interface NavVerificationIssue {
-  label: string;
-  entryId: string;
-  navPath: string;
-}
-
 export interface RuntimeAdapterOptions {
   config: ResolvedConfig;
   graph: DocsGraph;
-  navTree: NavTree;
 }
 
 /**
@@ -37,19 +27,20 @@ export class RuntimeAdapter {
   private options: RuntimeAdapterOptions;
   private workdir: string;
   private devProcess: ChildProcess | null = null;
-  private readonly availableEntryIds: Set<string>;
-  private navVerificationIssues: NavVerificationIssue[] = [];
-  private navVerificationIssueKeys = new Set<string>();
 
   constructor(options: RuntimeAdapterOptions) {
     this.options = options;
-    this.workdir = path.join(options.config.root, WORKDIR_NAME);
-    this.availableEntryIds = new Set(options.graph.pages.map((p) => p.entryId));
+    this.workdir = feaDocsWorkspaceCacheDir(options.config.root);
   }
 
   /** Return path to the ephemeral Starlight project. */
   get projectDir(): string {
     return path.join(this.workdir, 'app');
+  }
+
+  /** Return workspace cache directory used by this runtime. */
+  get runtimeDir(): string {
+    return this.workdir;
   }
 
   /** Ensure the ephemeral project exists and is up to date. */
@@ -118,88 +109,9 @@ export class RuntimeAdapter {
     return deps;
   }
 
-  getNavVerificationIssues(): NavVerificationIssue[] {
-    return [...this.navVerificationIssues];
-  }
-
-  private navEntryNotFoundLink(entryId: string, label: string): string {
-    const params = new URLSearchParams({ missing: entryId, label });
-    return `/${NAV_ENTRY_NOT_FOUND_ENTRY_ID}/?${params.toString()}`;
-  }
-
-  private recordMissingNavEntry(entryId: string, label: string, navPath: string): void {
-    const key = `${entryId}|${label}|${navPath}`;
-    if (this.navVerificationIssueKeys.has(key)) return;
-    this.navVerificationIssueKeys.add(key);
-    this.navVerificationIssues.push({ entryId, label, navPath });
-  }
-
-  private missingEntrySidebarLink(entryId: string, label: string, navPath: string): Record<string, unknown> {
-    this.recordMissingNavEntry(entryId, label, navPath);
-    return {
-      label,
-      link: this.navEntryNotFoundLink(entryId, label),
-      badge: {
-        text: 'Missing',
-        variant: 'caution',
-      },
-      attrs: {
-        title: `Missing entry id: ${entryId}`,
-      },
-    };
-  }
-
-  private hasEntryId(entryId: string): boolean {
-    return this.availableEntryIds.has(entryId) || entryId === NAV_ENTRY_NOT_FOUND_ENTRY_ID;
-  }
-
-  /**
-   * Convert our NavTree into Starlight's sidebar format.
-   * Leaf: { slug } when pointing to docs content.
-   * Group: { label, items }.
-   *
-   * For section indexes (README with children), Starlight does not accept
-   * `{ label, link, items }`. We represent the section index as the first child
-   * item using `{ slug }` inside the group's `items` array.
-   */
-  private navItemToStarlight(item: NavItem, pathParts: string[]): unknown {
-    const navPath = pathParts.join(' > ');
-    if (item.children && item.children.length > 0) {
-      const items = item.children.map((c) => this.navItemToStarlight(c, [...pathParts, c.label]));
-      if (item.entryId !== undefined) {
-        if (this.hasEntryId(item.entryId)) {
-          items.unshift({ slug: item.entryId });
-        } else {
-          items.unshift(this.missingEntrySidebarLink(item.entryId, item.label, navPath));
-        }
-      }
-      return {
-        label: item.label,
-        items,
-      };
-    }
-    if (item.entryId !== undefined) {
-      if (!this.hasEntryId(item.entryId)) {
-        return this.missingEntrySidebarLink(item.entryId, item.label, navPath);
-      }
-      return { slug: item.entryId };
-    }
-    return {
-      label: item.label,
-      link: '/',
-    };
-  }
-
-  private navTreeToStarlightConfig(navTree: NavTree): string {
-    this.navVerificationIssues = [];
-    this.navVerificationIssueKeys = new Set<string>();
-    const sidebar = navTree.map((item) => this.navItemToStarlight(item, [item.label]));
-    return JSON.stringify(sidebar, null, 2);
-  }
-
   private async writeAstroConfig(): Promise<void> {
-    const { config, navTree } = this.options;
-    const navJson = this.navTreeToStarlightConfig(navTree);
+    const { config } = this.options;
+    const title = this.resolveSiteTitle(config);
 
     const frameworkImports = config.frameworks
       .map((fw) => {
@@ -241,10 +153,13 @@ import remarkStripLeadH1 from './remark-strip-lead-h1.mjs';
 ${frameworkImports}
 
 export default defineConfig({
+  publicDir: ${JSON.stringify(config.root)},
   integrations: [
     starlight({
-      title: 'Docs',
-      sidebar: ${navJson},
+      title: ${JSON.stringify(title)},
+      sidebar: [
+        { autogenerate: { directory: 'docs' } },
+      ],
     }),
     ${frameworkIntegrations}
   ],
@@ -258,7 +173,7 @@ export default defineConfig({
     },
     server: {
       fs: {
-        allow: [${JSON.stringify(this.projectDir)}, ${JSON.stringify(path.join(this.workdir, 'content-stage'))}],
+        allow: [${JSON.stringify(this.projectDir)}, ${JSON.stringify(this.options.config.root)}],
       },
       ${config.expose || config.tailscaleServe ? 'allowedHosts: true,' : ''}
     },
@@ -270,6 +185,25 @@ export default defineConfig({
 `.trimStart();
 
     fs.writeFileSync(path.join(this.projectDir, 'astro.config.mjs'), astroConfig);
+  }
+
+  private resolveSiteTitle(config: ResolvedConfig): string {
+    const explicitName = config.name?.trim();
+    if (explicitName) return explicitName;
+
+    const explicit = config.title?.trim();
+    if (explicit) return explicit;
+
+    const base = path.basename(path.resolve(config.root)).trim();
+    if (!base) return 'Docs';
+
+    const words = base
+      .replace(/[-_]+/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1));
+
+    return words.length > 0 ? words.join(' ') : 'Docs';
   }
 
   /**
@@ -286,11 +220,10 @@ export default defineConfig({
     // passes the full app-internal path to remark: e.g.
     //   <projectDir>/src/content/docs/docs/2-plan.md
     // We need to strip the app content dir prefix to get the slug-map key.
-    // We also keep stageDir and sourceRoot as fallbacks for other Astro versions.
+    // We also keep sourceRoot as a fallback for other Astro versions.
     const appContentDir = path
       .join(this.projectDir, 'src', 'content', 'docs')
       .replace(/\\/g, '/');
-    const stageDir = path.join(this.workdir, 'content-stage').replace(/\\/g, '/');
     const sourceRoot = this.options.config.root.replace(/\\/g, '/');
 
     const plugin = `
@@ -299,7 +232,6 @@ import { visit } from 'unist-util-visit';
 
 const slugMap = ${JSON.stringify(slugMap, null, 2)};
 const appContentDir = ${JSON.stringify(appContentDir)};
-const stageDir = ${JSON.stringify(stageDir)};
 const sourceRoot = ${JSON.stringify(sourceRoot)};
 
 function stripPrefix(absPath, prefix) {
@@ -315,24 +247,51 @@ export default function remarkRewriteMdLinks() {
     // Astro 6 passes the full app-internal path; try each prefix in order.
     const relPath =
       stripPrefix(absPath, appContentDir) ??
-      stripPrefix(absPath, stageDir) ??
       stripPrefix(absPath, sourceRoot) ??
       path.posix.relative(sourceRoot, absPath);
     const sourceDir = path.posix.dirname(relPath);
 
-    visit(tree, 'link', (node) => {
-      const href = node.url;
-      if (!href || /^https?:\\/\\/|^mailto:|^#/.test(href)) return;
-      if (!/\\.mdx?$/i.test(href)) return;
+    function splitUrl(url) {
+      const match = url.match(/^([^?#]*)(.*)$/);
+      return [match?.[1] ?? url, match?.[2] ?? ''];
+    }
 
-      const [hrefPath, fragment] = href.split('#');
-      const resolved = path.posix.normalize(
-        sourceDir === '.' ? hrefPath : sourceDir + '/' + hrefPath,
+    function isExternalOrAbsolute(url) {
+      return /^(?:[a-z][a-z0-9+.-]*:|\\/\\/|#|\\/)/i.test(url);
+    }
+
+    function resolveRelative(urlPath) {
+      return path.posix.normalize(
+        sourceDir === '.' ? urlPath : sourceDir + '/' + urlPath,
       );
-      const entryId = slugMap[resolved];
-      if (entryId === undefined) return;
-      node.url = '/' + entryId + '/' + (fragment ? '#' + fragment : '');
-    });
+    }
+
+    function rewriteUrl(url) {
+      if (!url || isExternalOrAbsolute(url)) return url;
+
+      const [urlPath, suffix] = splitUrl(url);
+      if (!urlPath) return url;
+
+      if (/\\.mdx?$/i.test(urlPath)) {
+        const resolved = resolveRelative(urlPath);
+        const entryId = slugMap[resolved];
+        if (entryId === undefined) return url;
+        return '/' + entryId + '/' + suffix;
+      }
+
+      const resolved = resolveRelative(urlPath);
+      if (resolved === '..' || resolved.startsWith('../')) return url;
+      return '/' + resolved + suffix;
+    }
+
+    const rewriteNodeUrl = (node) => {
+      if (!node?.url) return;
+      node.url = rewriteUrl(node.url);
+    };
+
+    visit(tree, 'link', rewriteNodeUrl);
+    visit(tree, 'image', rewriteNodeUrl);
+    visit(tree, 'definition', rewriteNodeUrl);
   };
 }
 `.trimStart();
@@ -376,81 +335,25 @@ export default function remarkStripLeadH1() {
   }
 
   /**
-   * Build a staging directory of per-file symlinks, then point
-   * src/content/docs at it.
+   * Point src/content/docs at the configured source root.
    *
-   * We cannot symlink src/content/docs directly to the repo root because the
-   * repo root contains .fea-docs/ which would create an infinite cycle.
-   * Instead we create .fea-docs/content-stage/ and populate it with one
-   * symlink per discovered page, preserving directory structure. Astro then
-   * sees a clean tree with no cycles.
-   *
-   * preserveSymlinks: true in Vite ensures Astro resolves each file's path
-   * relative to the symlink location (inside content-stage/) rather than the
-   * real path (repo root), so collection membership is correctly determined.
+   * Runtime app artifacts are stored in a per-workspace user cache directory,
+   * outside the source root. This allows a single directory-level symlink
+   * without creating recursive cycles.
    */
   async writeContentLinks(): Promise<void> {
-    const stageDir = path.join(this.workdir, 'content-stage');
     const contentParent = path.join(this.projectDir, 'src', 'content');
     const contentDir = path.join(contentParent, 'docs');
 
-    // Rebuild staging dir from scratch
-    fs.rmSync(stageDir, { recursive: true, force: true });
-    fs.mkdirSync(stageDir, { recursive: true });
-
-    for (const page of this.options.graph.pages) {
-      const destPath = path.join(stageDir, page.relativePath);
-      fs.mkdirSync(path.dirname(destPath), { recursive: true });
-      fs.symlinkSync(page.absolutePath, destPath, 'file');
-    }
-
-    this.writeNavEntryNotFoundPage();
-
-    // Point src/content/docs at the staging dir
+    // Point src/content/docs at the full docs root.
     fs.rmSync(contentDir, { recursive: true, force: true });
     fs.mkdirSync(contentParent, { recursive: true });
-    fs.symlinkSync(stageDir, contentDir, 'dir');
+    fs.symlinkSync(this.options.config.root, contentDir, 'dir');
 
     // Always write a redirect from / to the first content page.
     // A top-level README gets slug '' but Starlight serves it at /readme/,
     // not /, so we can never rely on Starlight to handle the root URL itself.
     this.writeIndexRedirect();
-  }
-
-  private writeNavEntryNotFoundPage(): void {
-    const destPath = path.join(this.projectDir, 'src', 'pages', '__fea-docs', 'nav-entry-not-found', 'index.astro');
-    fs.mkdirSync(path.dirname(destPath), { recursive: true });
-
-    const content = `---
-import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
-
-const missing = Astro.url.searchParams.get('missing') ?? 'unknown-entry-id';
-const label = Astro.url.searchParams.get('label') ?? 'Unknown item';
----
-
-<StarlightPage frontmatter={{ title: 'Entry Not Found' }}>
-  <h1>Entry Not Found</h1>
-  <p>
-    This sidebar item points to an entry id that is not available in the docs collection.
-  </p>
-
-  <div class="sl-markdown-content">
-    <p><strong>Sidebar label:</strong> <code>{label}</code></p>
-    <p><strong>Missing entry id:</strong> <code>{missing}</code></p>
-  </div>
-
-  <p>
-    This can happen when a page is excluded by <code>.gitignore</code> or your <code>ignore</code>
-    config, or when a sidebar entry id no longer matches a loaded docs page.
-  </p>
-
-  <p>
-    <a href="/">Go to docs home</a> · <a href="/readme/">Open README</a>
-  </p>
-</StarlightPage>
-`;
-
-    fs.writeFileSync(destPath, content);
   }
 
   private writeIndexRedirect(): void {
@@ -471,7 +374,7 @@ const label = Astro.url.searchParams.get('label') ?? 'Unknown item';
 
   /**
    * Write src/content.config.ts — Astro 6 Content Layer API.
-   * Uses glob() loader pointing at src/content/docs (the symlink to content-stage).
+   * Uses glob() loader pointing at src/content/docs (symlink to source root).
    * docsSchema() ensures Starlight's head/sidebar fields are initialised.
    * All source files are guaranteed to have a title by the time this runs
    * because parseDocFile injects one if missing during the scan phase.

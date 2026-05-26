@@ -6,6 +6,8 @@ import { SessionCacheManager } from '../cache/manager.js';
 import type { ResolvedConfig } from '../types.js';
 
 const baseConfig: ResolvedConfig = {
+  name: undefined,
+  title: undefined,
   root: '/tmp/test',
   ignore: [],
   port: 4321,

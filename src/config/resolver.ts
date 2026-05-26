@@ -13,6 +13,8 @@ const CONFIG_CANDIDATES = [
 const SUPPORTED_FRAMEWORKS = new Set(['react', 'vue', 'svelte', 'solid', 'qwik']);
 
 const DEFAULT_CONFIG: ResolvedConfig = {
+  name: undefined,
+  title: undefined,
   root: process.cwd(),
   ignore: [],
   port: 4321,

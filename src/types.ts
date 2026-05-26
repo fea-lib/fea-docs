@@ -46,6 +46,10 @@ export type NavTree = NavItem[];
 
 /** fea-docs configuration (from config file or CLI flags). */
 export interface FeaDocsConfig {
+  /** Site name shown in the docs UI. */
+  name?: string;
+  /** Site title shown in the docs UI. */
+  title?: string;
   /** Scope root override (default: process.cwd()). */
   root?: string;
   /** Additional ignore globs on top of defaults. */
@@ -64,6 +68,8 @@ export interface FeaDocsConfig {
 
 /** Resolved, merged runtime config (all fields present). */
 export interface ResolvedConfig {
+  name?: string;
+  title?: string;
   root: string;
   ignore: string[];
   port: number;

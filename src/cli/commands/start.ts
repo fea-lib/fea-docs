@@ -3,36 +3,17 @@ import pc from 'picocolors';
 import { execSync } from 'node:child_process';
 import { inferConfigFromDocs, resolveConfig } from '../../config/resolver.js';
 import { ContentGraphEngine } from '../../content-graph/engine.js';
-import { NavigationBuilder } from '../../navigation/builder.js';
 import { RuntimeAdapter } from '../../runtime/adapter.js';
 import { SessionCacheManager } from '../../cache/manager.js';
-import { ensureGitignore } from '../../utils/gitignore.js';
 import { inferFrameworksFromMdxGraph } from '../../mdx-framework/inferer.js';
 import type { ResolvedConfig } from '../../types.js';
-
-function logNavVerificationWarnings(adapter: RuntimeAdapter): void {
-  const issues = adapter.getNavVerificationIssues();
-  if (issues.length === 0) return;
-
-  console.warn(
-    pc.yellow(
-      `WARN [NAV_ENTRY_NOT_FOUND] ${issues.length} sidebar entr${issues.length === 1 ? 'y is' : 'ies are'} pointing to missing entry ids. Redirecting to the entry-not-found page.`,
-    ),
-  );
-  for (const issue of issues) {
-    console.warn(
-      pc.yellow(
-        `  - ${issue.navPath}: "${issue.label}" -> "${issue.entryId}"`,
-      ),
-    );
-  }
-}
 
 export function startCommand(): Command {
   return new Command('start')
     .description('Start a local Starlight docs preview from the current directory')
     .option('--port <number>', 'Port to use for the dev server', (v) => Number(v))
     .option('--open', 'Open the browser automatically on start')
+    .option('--name <text>', 'Custom docs site name/title')
     .option('--config <path>', 'Path to an explicit config file')
     .option('--strict', 'Enable strict validation mode')
     .option(
@@ -47,6 +28,7 @@ export function startCommand(): Command {
       const cliFlags: Partial<ResolvedConfig> = {
         ...(opts.port !== undefined ? { port: opts.port } : {}),
         ...(opts.open ? { open: true } : {}),
+        ...(opts.name ? { name: String(opts.name) } : {}),
         ...(opts.strict ? { strict: true } : {}),
         ...(opts.ignore ? { ignore: opts.ignore } : {}),
         ...(opts.framework ? { frameworks: opts.framework } : {}),
@@ -98,21 +80,16 @@ export function startCommand(): Command {
           throw new Error('Strict mode failed due to unresolved local MDX imports.');
         }
 
-        // Build navigation
-        const navBuilder = new NavigationBuilder();
-        const navTree = navBuilder.build(graph);
-
         // Session cache
         const pageRelPaths = graph.pages.map((p) => p.relativePath);
         const cache = new SessionCacheManager(config.root);
         const cacheHit = cache.isValid(config, pageRelPaths);
 
         // Materialize Starlight app
-        const adapter = new RuntimeAdapter({ config, graph, navTree });
+        const adapter = new RuntimeAdapter({ config, graph });
         console.log(pc.cyan(cacheHit ? 'Refreshing Starlight runtime...' : 'Preparing Starlight runtime...'));
-        ensureGitignore(config.root);
         await adapter.materialize();
-        logNavVerificationWarnings(adapter);
+        console.log(pc.cyan(`Runtime cache dir: ${adapter.runtimeDir}`));
         cache.save(config, pageRelPaths);
 
         // Platform features

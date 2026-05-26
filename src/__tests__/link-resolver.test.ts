@@ -85,7 +85,19 @@ describe('LinkAssetResolver', () => {
     const resolver = new LinkAssetResolver(graph, true);
     const result = resolver.resolveLink('logo.png', 'index.md');
     expect(result.resolved).toBe(true);
-    expect(result.href).toBe('/_assets/logo.png');
+    expect(result.href).toBe('/logo.png');
+  });
+
+  it('resolves nested asset links to natural absolute paths', () => {
+    fs.mkdirSync(path.join(tmpDir, 'docs', 'guide'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, 'docs', 'guide', 'sheet.pdf'), 'fake-pdf');
+
+    const graph = makeGraph([{ rel: 'docs/guide/intro.md' }]);
+    const resolver = new LinkAssetResolver(graph, true);
+    const result = resolver.resolveLink('sheet.pdf', 'docs/guide/intro.md');
+
+    expect(result.resolved).toBe(true);
+    expect(result.href).toBe('/docs/guide/sheet.pdf');
   });
 
   it('emits warning for missing asset in dev mode', () => {

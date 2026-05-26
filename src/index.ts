@@ -1,5 +1,4 @@
 export { ContentGraphEngine } from './content-graph/engine.js';
-export { NavigationBuilder } from './navigation/builder.js';
 export { LinkAssetResolver } from './link-asset/resolver.js';
 export { StrictValidator } from './strict/validator.js';
 export { RuntimeAdapter } from './runtime/adapter.js';

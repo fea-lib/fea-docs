@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import type { ResolvedConfig } from '../types.js';
+import { feaDocsWorkspaceCacheDir } from '../utils/cache-dir.js';
 
 export interface CacheEntry {
   fingerprint: string;
@@ -17,7 +18,7 @@ export class SessionCacheManager {
   private cachePath: string;
 
   constructor(root: string) {
-    this.cacheDir = path.join(root, '.fea-docs', 'cache');
+    this.cacheDir = path.join(feaDocsWorkspaceCacheDir(root), 'cache');
     this.cachePath = path.join(this.cacheDir, 'session.json');
   }
 

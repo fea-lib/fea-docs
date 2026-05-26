@@ -86,6 +86,6 @@ export class LinkAssetResolver {
       return { resolved: false, diagnostic };
     }
 
-    return { resolved: true, href: `/_assets/${assetRelPath}` };
+    return { resolved: true, href: `/${assetRelPath}` };
   }
 }

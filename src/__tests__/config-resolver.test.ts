@@ -17,6 +17,8 @@ function writeFile(dir: string, relPath: string, content: string): void {
 
 function baseConfig(root: string): ResolvedConfig {
   return {
+    name: undefined,
+    title: undefined,
     root,
     ignore: [],
     port: 4321,
@@ -48,10 +50,11 @@ describe('resolveConfig', () => {
     writeFile(
       tmpDir,
       'fea-docs.config.mjs',
-      "export default { frameworks: ['react'], aliases: { '@lib': '/tmp/lib' } };\n",
+      "export default { name: 'Workspace Docs', frameworks: ['react'], aliases: { '@lib': '/tmp/lib' } };\n",
     );
 
     const resolved = await resolveConfig({});
+    expect(resolved.name).toBe('Workspace Docs');
     expect(resolved.frameworks).toContain('react');
     expect(resolved.aliases['@lib']).toBe('/tmp/lib');
   });
