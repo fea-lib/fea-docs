@@ -1,9 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { normalizeBasePath } from '../utils/base-path.js';
 
 export interface GhPagesOptions {
   /** Repository root. */
   root: string;
+  /** Base path used by deployed docs (e.g. /my-repo). */
+  base?: string;
   /** Whether to generate deployment docs. */
   generateDocs?: boolean;
 }
@@ -37,7 +40,7 @@ jobs:
           node-version: 20
 
       - name: Build docs
-        run: npx fea-docs build --out-dir ./dist
+        run: __FEA_DOCS_BUILD_COMMAND__
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -98,15 +101,30 @@ export class GithubPagesBootstrapper {
     fs.mkdirSync(workflowDir, { recursive: true });
 
     const workflowPath = path.join(workflowDir, 'deploy-docs.yml');
-    fs.writeFileSync(workflowPath, WORKFLOW_YAML);
+    fs.writeFileSync(workflowPath, this.buildWorkflowYaml());
 
     if (this.options.generateDocs) {
       const docsPath = path.join(this.options.root, 'docs', 'gh-pages-setup.md');
       fs.mkdirSync(path.dirname(docsPath), { recursive: true });
-      fs.writeFileSync(docsPath, `---\ntitle: GitHub Pages Setup\n---\n${SETUP_INSTRUCTIONS}`);
+      fs.writeFileSync(docsPath, `---\ntitle: GitHub Pages Setup\n---\n${this.setupInstructions()}`);
     }
 
     console.log(`\nGenerated: ${workflowPath}`);
-    console.log(SETUP_INSTRUCTIONS);
+    console.log(this.setupInstructions());
+  }
+
+  private buildWorkflowYaml(): string {
+    const normalizedBase = this.options.base ? normalizeBasePath(this.options.base) : undefined;
+    const baseFlag = normalizedBase ? ` --base ${JSON.stringify(normalizedBase)}` : '';
+    const buildCommand = `npx fea-docs build --out-dir ./dist${baseFlag}`;
+    return WORKFLOW_YAML.replace('__FEA_DOCS_BUILD_COMMAND__', buildCommand);
+  }
+
+  private setupInstructions(): string {
+    const normalizedBase = this.options.base ? normalizeBasePath(this.options.base) : undefined;
+    const baseNote = this.options.base
+      ? `\nConfigured base path: \`${normalizedBase}\`.\n`
+      : '\nIf deploying to a GitHub Pages project site, pass --base /<repo> to fea-docs build.\n';
+    return `${SETUP_INSTRUCTIONS}${baseNote}`;
   }
 }

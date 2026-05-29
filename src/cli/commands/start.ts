@@ -7,6 +7,7 @@ import { RuntimeAdapter } from '../../runtime/adapter.js';
 import { SessionCacheManager } from '../../cache/manager.js';
 import { inferFrameworksFromMdxGraph } from '../../mdx-framework/inferer.js';
 import type { ResolvedConfig } from '../../types.js';
+import { joinBasePath } from '../../utils/base-path.js';
 
 export function startCommand(): Command {
   return new Command('start')
@@ -14,6 +15,7 @@ export function startCommand(): Command {
     .option('--port <number>', 'Port to use for the dev server', (v) => Number(v))
     .option('--open', 'Open the browser automatically on start')
     .option('--name <text>', 'Custom docs site name/title')
+    .option('--base <path>', 'Base URL path for deployed docs (e.g. /my-repo)')
     .option('--config <path>', 'Path to an explicit config file')
     .option('--strict', 'Enable strict validation mode')
     .option(
@@ -29,6 +31,7 @@ export function startCommand(): Command {
         ...(opts.port !== undefined ? { port: opts.port } : {}),
         ...(opts.open ? { open: true } : {}),
         ...(opts.name ? { name: String(opts.name) } : {}),
+        ...(opts.base ? { base: String(opts.base) } : {}),
         ...(opts.strict ? { strict: true } : {}),
         ...(opts.ignore ? { ignore: opts.ignore } : {}),
         ...(opts.framework ? { frameworks: opts.framework } : {}),
@@ -100,7 +103,7 @@ export function startCommand(): Command {
         // Start dev server
         console.log(pc.cyan(`Starting dev server on port ${config.port}...`));
         const port = await adapter.startDev(config.port);
-        const url = `http://localhost:${port}`;
+        const url = `http://localhost:${port}${joinBasePath(config.base, '/')}`;
         console.log(`\n${pc.green('Docs available at:')} ${pc.bold(pc.underline(url))}\n`);
 
         if (config.open) {

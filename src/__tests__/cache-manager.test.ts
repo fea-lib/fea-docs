@@ -9,6 +9,7 @@ const baseConfig: ResolvedConfig = {
   name: undefined,
   title: undefined,
   root: '/tmp/test',
+  base: '/',
   ignore: [],
   port: 4321,
   open: false,

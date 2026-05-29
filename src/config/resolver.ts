@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { ResolvedConfig } from '../types.js';
+import { normalizeBasePath } from '../utils/base-path.js';
 
 const CONFIG_CANDIDATES = [
   'fea-docs.config.mjs',
@@ -16,6 +17,7 @@ const DEFAULT_CONFIG: ResolvedConfig = {
   name: undefined,
   title: undefined,
   root: process.cwd(),
+  base: '/',
   ignore: [],
   port: 4321,
   open: false,
@@ -72,6 +74,7 @@ export async function resolveConfig(
       ...(fileConfig.aliases ?? {}),
       ...(cliFlags.aliases ?? {}),
     },
+    base: normalizeBasePath(cliFlags.base ?? envConfig.base ?? fileConfig.base ?? DEFAULT_CONFIG.base),
   };
 }
 

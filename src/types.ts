@@ -52,6 +52,8 @@ export interface FeaDocsConfig {
   title?: string;
   /** Scope root override (default: process.cwd()). */
   root?: string;
+  /** Base URL path for deployed docs (e.g. /my-repo). */
+  base?: string;
   /** Additional ignore globs on top of defaults. */
   ignore?: string[];
   /** Framework adapters to enable. */
@@ -71,6 +73,7 @@ export interface ResolvedConfig {
   name?: string;
   title?: string;
   root: string;
+  base: string;
   ignore: string[];
   port: number;
   open: boolean;

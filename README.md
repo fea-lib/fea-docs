@@ -34,11 +34,20 @@ npx fea-docs@latest start
 # Start on a specific port and open the browser
 npx fea-docs@latest start --port 3000 --open
 
+# Start with a custom base path (for subpath hosting)
+npx fea-docs@latest start --base /my-repo
+
 # Build static output for deployment
 npx fea-docs@latest build --out-dir ./dist
 
+# Build static output for GitHub Pages project site
+npx fea-docs@latest build --out-dir ./dist --base /my-repo
+
 # Bootstrap GitHub Pages deployment
 npx fea-docs@latest setup gh-pages
+
+# Bootstrap GitHub Pages deployment with base path
+npx fea-docs@latest setup gh-pages --base /my-repo
 
 # Enable strict validation (default in build mode)
 npx fea-docs@latest start --strict
@@ -67,6 +76,7 @@ Pass an explicit config file with `--config <path>`. No implicit config search i
 ```js
 // fea-docs.config.mjs
 export default {
+  base: '/my-repo',
   ignore: ['**/drafts/**'],
   port: 3000,
   frameworks: ['react'],
@@ -75,6 +85,13 @@ export default {
   },
 };
 ```
+
+### Base path deployments
+
+When deploying docs under a subpath (for example GitHub Pages project sites at
+`https://<user>.github.io/<repo>/`), set `base` to `/<repo>` either in config
+or via `--base` on `start`/`build`. This ensures redirects, internal links,
+and static asset URLs are generated correctly for that mount point.
 
 ## How it works
 

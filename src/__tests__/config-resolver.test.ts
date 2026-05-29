@@ -20,6 +20,7 @@ function baseConfig(root: string): ResolvedConfig {
     name: undefined,
     title: undefined,
     root,
+    base: '/',
     ignore: [],
     port: 4321,
     open: false,
@@ -57,6 +58,28 @@ describe('resolveConfig', () => {
     expect(resolved.name).toBe('Workspace Docs');
     expect(resolved.frameworks).toContain('react');
     expect(resolved.aliases['@lib']).toBe('/tmp/lib');
+  });
+
+  it('normalizes custom base path from config', async () => {
+    writeFile(
+      tmpDir,
+      'fea-docs.config.mjs',
+      "export default { base: 'repo//' };\n",
+    );
+
+    const resolved = await resolveConfig({});
+    expect(resolved.base).toBe('/repo');
+  });
+
+  it('uses CLI base over config and normalizes it', async () => {
+    writeFile(
+      tmpDir,
+      'fea-docs.config.mjs',
+      "export default { base: '/from-config' };\n",
+    );
+
+    const resolved = await resolveConfig({ base: 'from-cli/' });
+    expect(resolved.base).toBe('/from-cli');
   });
 });
 

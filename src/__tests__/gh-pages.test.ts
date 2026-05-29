@@ -27,6 +27,16 @@ describe('GithubPagesBootstrapper', () => {
     expect(content).toContain('deploy-pages');
   });
 
+  it('includes a normalized base flag in workflow when provided', async () => {
+    const bootstrapper = new GithubPagesBootstrapper({ root: tmpDir, base: 'repo/' });
+    await bootstrapper.bootstrap();
+
+    const workflowPath = path.join(tmpDir, '.github', 'workflows', 'deploy-docs.yml');
+    const content = fs.readFileSync(workflowPath, 'utf-8');
+
+    expect(content).toContain('npx fea-docs build --out-dir ./dist --base "/repo"');
+  });
+
   it('optionally generates deployment docs', async () => {
     const bootstrapper = new GithubPagesBootstrapper({ root: tmpDir, generateDocs: true });
     await bootstrapper.bootstrap();

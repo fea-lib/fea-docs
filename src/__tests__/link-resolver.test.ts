@@ -62,6 +62,17 @@ describe('LinkAssetResolver', () => {
     expect(result.href).toBe('/guide/intro/');
   });
 
+  it('resolves internal doc links with custom base path', () => {
+    const graph = makeGraph([
+      { rel: 'index.md' },
+      { rel: 'guide/intro.md' },
+    ]);
+    const resolver = new LinkAssetResolver(graph, true, '/repo');
+    const result = resolver.resolveLink('guide/intro.md', 'index.md');
+    expect(result.resolved).toBe(true);
+    expect(result.href).toBe('/repo/guide/intro/');
+  });
+
   it('emits warning for broken internal link in dev mode', () => {
     const graph = makeGraph([{ rel: 'index.md' }]);
     const resolver = new LinkAssetResolver(graph, true);
@@ -86,6 +97,15 @@ describe('LinkAssetResolver', () => {
     const result = resolver.resolveLink('logo.png', 'index.md');
     expect(result.resolved).toBe(true);
     expect(result.href).toBe('/logo.png');
+  });
+
+  it('resolves existing asset file with custom base path', () => {
+    fs.writeFileSync(path.join(tmpDir, 'logo.png'), 'fake-image');
+    const graph = makeGraph([{ rel: 'index.md' }]);
+    const resolver = new LinkAssetResolver(graph, true, '/repo');
+    const result = resolver.resolveLink('logo.png', 'index.md');
+    expect(result.resolved).toBe(true);
+    expect(result.href).toBe('/repo/logo.png');
   });
 
   it('resolves nested asset links to natural absolute paths', () => {

@@ -8,11 +8,13 @@ export function setupCommand(): Command {
   setup
     .command('gh-pages')
     .description('Bootstrap GitHub Pages deployment for this repository')
+    .option('--base <path>', 'Base URL path for deployed docs (e.g. /my-repo)')
     .option('--generate-docs', 'Generate deployment documentation in the docs directory')
     .action(async (opts) => {
       try {
         const bootstrapper = new GithubPagesBootstrapper({
           root: process.cwd(),
+          base: opts.base ? String(opts.base) : undefined,
           generateDocs: opts.generateDocs,
         });
         await bootstrapper.bootstrap();

@@ -15,6 +15,7 @@ function makeConfig(root: string): ResolvedConfig {
     name: undefined,
     title: undefined,
     root,
+    base: '/',
     ignore: [],
     port: 4321,
     open: false,
@@ -133,6 +134,7 @@ describe('RuntimeAdapter content loader config', () => {
 
     const astroConfig = fs.readFileSync(path.join(adapter.projectDir, 'astro.config.mjs'), 'utf-8');
 
+    expect(astroConfig).toContain("base: \"/\"");
     expect(astroConfig).toContain(`publicDir: ${JSON.stringify(tmpDir)}`);
     expect(astroConfig).toContain("sidebar: [");
     expect(astroConfig).toContain("{ autogenerate: { directory: 'docs' } }");
@@ -159,7 +161,32 @@ describe('RuntimeAdapter content loader config', () => {
     expect(plugin).toContain("visit(tree, 'image', rewriteNodeUrl);");
     expect(plugin).toContain("visit(tree, 'definition', rewriteNodeUrl);");
     expect(plugin).toContain("if (/\\.mdx?$/i.test(urlPath)) {");
-    expect(plugin).toContain("return '/' + resolved + suffix;");
+    expect(plugin).toContain("return toBaseUrl('/' + resolved) + suffix;");
+  });
+
+  it('writes base-aware redirect and URL rewrites', async () => {
+    const graph = makeGraph(tmpDir, [
+      { rel: 'guide/intro.md', label: 'Intro', entryId: 'guide/intro' },
+    ]);
+
+    const adapter = new RuntimeAdapter({
+      config: { ...makeConfig(tmpDir), base: '/repo' },
+      graph,
+    });
+
+    fs.mkdirSync(path.join(adapter.projectDir, 'src'), { recursive: true });
+    await invokePrivate(adapter, 'writeAstroConfig');
+    await invokePrivate(adapter, 'writeRemarkPlugin');
+    await invokePrivate(adapter, 'writeContentLinks');
+
+    const astroConfig = fs.readFileSync(path.join(adapter.projectDir, 'astro.config.mjs'), 'utf-8');
+    const plugin = fs.readFileSync(path.join(adapter.projectDir, 'remark-rewrite-md-links.mjs'), 'utf-8');
+    const indexPage = fs.readFileSync(path.join(adapter.projectDir, 'src', 'pages', 'index.astro'), 'utf-8');
+
+    expect(astroConfig).toContain("base: \"/repo\"");
+    expect(plugin).toContain('const basePath = "/repo";');
+    expect(plugin).toContain("return toBaseUrl('/' + entryId + '/') + suffix;");
+    expect(indexPage).toContain('Astro.redirect("/repo/guide/intro/")');
   });
 
   it('uses explicit config title when provided', async () => {

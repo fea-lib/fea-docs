@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { DocsGraph, Diagnostic } from '../types.js';
+import { joinBasePath, normalizeBasePath } from '../utils/base-path.js';
 
 export interface LinkResolutionResult {
   resolved: boolean;
@@ -19,10 +20,12 @@ export class LinkAssetResolver {
   private graph: DocsGraph;
   private entryIdByRelPath: Map<string, string>;
   private devMode: boolean;
+  private base: string;
 
-  constructor(graph: DocsGraph, devMode = true) {
+  constructor(graph: DocsGraph, devMode = true, base = '/') {
     this.graph = graph;
     this.devMode = devMode;
+    this.base = normalizeBasePath(base);
     this.entryIdByRelPath = new Map(graph.pages.map((p) => [p.relativePath, p.entryId]));
   }
 
@@ -66,7 +69,8 @@ export class LinkAssetResolver {
         return { resolved: false, diagnostic };
       }
 
-      const finalHref = fragment ? `/${entryId}/#${fragment}` : `/${entryId}/`;
+      const route = joinBasePath(this.base, `/${entryId}/`);
+      const finalHref = fragment ? `${route}#${fragment}` : route;
       return { resolved: true, href: finalHref };
     }
 
@@ -86,6 +90,6 @@ export class LinkAssetResolver {
       return { resolved: false, diagnostic };
     }
 
-    return { resolved: true, href: `/${assetRelPath}` };
+    return { resolved: true, href: joinBasePath(this.base, `/${assetRelPath}`) };
   }
 }

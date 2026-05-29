@@ -3,6 +3,7 @@ import path from 'node:path';
 import { execSync, spawn, type ChildProcess } from 'node:child_process';
 import type { DocsGraph, ResolvedConfig } from '../types.js';
 import { feaDocsWorkspaceCacheDir } from '../utils/cache-dir.js';
+import { joinBasePath } from '../utils/base-path.js';
 
 // Keep runtime content-loader discovery aligned with ContentGraphEngine:
 // include hidden dot-prefixed files/dirs by default, then rely on
@@ -153,6 +154,7 @@ import remarkStripLeadH1 from './remark-strip-lead-h1.mjs';
 ${frameworkImports}
 
 export default defineConfig({
+  base: ${JSON.stringify(config.base)},
   publicDir: ${JSON.stringify(config.root)},
   integrations: [
     starlight({
@@ -225,6 +227,7 @@ export default defineConfig({
       .join(this.projectDir, 'src', 'content', 'docs')
       .replace(/\\/g, '/');
     const sourceRoot = this.options.config.root.replace(/\\/g, '/');
+    const basePath = this.options.config.base;
 
     const plugin = `
 import path from 'node:path';
@@ -233,6 +236,7 @@ import { visit } from 'unist-util-visit';
 const slugMap = ${JSON.stringify(slugMap, null, 2)};
 const appContentDir = ${JSON.stringify(appContentDir)};
 const sourceRoot = ${JSON.stringify(sourceRoot)};
+const basePath = ${JSON.stringify(basePath)};
 
 function stripPrefix(absPath, prefix) {
   const p = absPath.replace(/\\\\/g, '/');
@@ -256,6 +260,12 @@ export default function remarkRewriteMdLinks() {
       return [match?.[1] ?? url, match?.[2] ?? ''];
     }
 
+    function toBaseUrl(pathname) {
+      const normalized = pathname.startsWith('/') ? pathname : '/' + pathname;
+      if (basePath === '/') return normalized;
+      return basePath + normalized;
+    }
+
     function isExternalOrAbsolute(url) {
       return /^(?:[a-z][a-z0-9+.-]*:|\\/\\/|#|\\/)/i.test(url);
     }
@@ -276,12 +286,12 @@ export default function remarkRewriteMdLinks() {
         const resolved = resolveRelative(urlPath);
         const entryId = slugMap[resolved];
         if (entryId === undefined) return url;
-        return '/' + entryId + '/' + suffix;
+        return toBaseUrl('/' + entryId + '/') + suffix;
       }
 
       const resolved = resolveRelative(urlPath);
       if (resolved === '..' || resolved.startsWith('../')) return url;
-      return '/' + resolved + suffix;
+      return toBaseUrl('/' + resolved) + suffix;
     }
 
     const rewriteNodeUrl = (node) => {
@@ -363,7 +373,7 @@ export default function remarkStripLeadH1() {
       this.options.graph.pages.find((p) => p.isSectionIndex && !p.relativePath.includes('/')) ??
       this.options.graph.pages[0];
     if (!landingPage) return;
-    const target = `/${landingPage.entryId}/`;
+    const target = joinBasePath(this.options.config.base, `/${landingPage.entryId}/`);
     const pagesDir = path.join(this.projectDir, 'src', 'pages');
     fs.mkdirSync(pagesDir, { recursive: true });
     fs.writeFileSync(

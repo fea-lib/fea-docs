@@ -25,6 +25,7 @@ export class SessionCacheManager {
   private fingerprint(config: ResolvedConfig, pages: string[] = []): string {
     const sig = JSON.stringify({
       root: config.root,
+      base: config.base,
       ignore: config.ignore,
       frameworks: config.frameworks,
       aliases: config.aliases,

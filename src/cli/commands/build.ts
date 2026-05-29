@@ -13,6 +13,7 @@ export function buildCommand(): Command {
     .description('Generate deployable static docs output')
     .option('--out-dir <path>', 'Output directory', 'dist')
     .option('--name <text>', 'Custom docs site name/title')
+    .option('--base <path>', 'Base URL path for deployed docs (e.g. /my-repo)')
     .option('--config <path>', 'Path to an explicit config file')
     .option('--strict', 'Enable strict validation (default in build mode)')
     .option('--ignore <glob...>', 'Additional ignore globs')
@@ -21,6 +22,7 @@ export function buildCommand(): Command {
       const cliFlags: Partial<ResolvedConfig> = {
         strict: true, // build always strict
         ...(opts.name ? { name: String(opts.name) } : {}),
+        ...(opts.base ? { base: String(opts.base) } : {}),
         ...(opts.ignore ? { ignore: opts.ignore } : {}),
         ...(opts.framework ? { frameworks: opts.framework } : {}),
       };
