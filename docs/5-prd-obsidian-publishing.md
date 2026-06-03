@@ -1,5 +1,5 @@
 ---
-title: 'Obsidian Publishing PRD'
+title: 'PRD: Obsidian Publishing'
 ---
 
 # PRD: Obsidian-Like Publishing with fea-docs
@@ -437,21 +437,23 @@ The product must support a constrained, reliable subset of Obsidian behavior thr
 
 ## Phase 0: pnpm Monorepo and npm Package Preparation
 
+**Status**: Complete. Implemented in `cee3c58` by migrating the repository to a pnpm workspace, moving the CLI into `packages/cli`, and scaffolding the initial public package set.
+
 ### What to Build
 
 Turn the `fea-docs` repository into a simple pnpm workspace monorepo, rename the existing package to `@fea-docs/cli`, and scaffold the public package layout for the normalization, syntax, Obsidian, and schema packages.
 
 ### Acceptance Criteria
 
-- [ ] The repository has a minimal `pnpm-workspace.yaml`.
-- [ ] The existing `fea-docs` package is renamed to `@fea-docs/cli`.
-- [ ] `@fea-docs/cli` can be published publicly under the `@fea-docs` npm organization scope.
-- [ ] Workspace packages are scaffolded for `@fea-docs/normalizer`, `@fea-docs/syntax-engine`, `@fea-docs/obsidian`, and `@fea-docs/schema`.
-- [ ] `@fea-docs/schema` defines initial TypeScript types for `fea-docs.manifest.json`, `fea-docs.diagnostics.json`, `fea-docs.graph.json`, `fea-docs.backlinks.json`, `fea-docs.search.json`, and `fea-docs.publish.json`.
-- [ ] Package exports are defined for each scaffolded public package.
-- [ ] Workspace-local dependency references are used between packages during development.
-- [ ] Existing `fea-docs` CLI commands continue to work after the package rename.
-- [ ] Documentation explains the package rename from `fea-docs` to `@fea-docs/cli` and the intended package responsibilities.
+- [x] The repository has a minimal `pnpm-workspace.yaml`.
+- [x] The existing `fea-docs` package is renamed to `@fea-docs/cli`.
+- [x] `@fea-docs/cli` can be published publicly under the `@fea-docs` npm organization scope.
+- [x] Workspace packages are scaffolded for `@fea-docs/normalizer`, `@fea-docs/syntax-engine`, `@fea-docs/obsidian`, and `@fea-docs/schema`.
+- [x] `@fea-docs/schema` defines initial TypeScript types for `fea-docs.manifest.json`, `fea-docs.diagnostics.json`, `fea-docs.graph.json`, `fea-docs.backlinks.json`, `fea-docs.search.json`, and `fea-docs.publish.json`.
+- [x] Package exports are defined for each scaffolded public package.
+- [x] Workspace-local dependency references are used between packages during development.
+- [x] Existing `fea-docs` CLI commands continue to work after the package rename.
+- [x] Documentation explains the package rename from `fea-docs` to `@fea-docs/cli` and the intended package responsibilities.
 
 ## Markdown-First Normalization Targets
 

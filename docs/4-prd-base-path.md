@@ -1,5 +1,5 @@
 ---
-title: "Implementation Plan: Base Path Support"
+title: "PRD: Implementation Plan: Base Path Support"
 ---
 
 ## Requirements
