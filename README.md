@@ -6,7 +6,9 @@ title: 'fea-docs'
 
 Zero-config documentation previewer and builder for any repository.
 
-Run `npx fea-docs@latest start` from any directory and get a live Starlight-powered docs site from your existing Markdown and MDX files — no framework setup, no configuration required.
+Run `npx @fea-docs/cli@latest start` from any directory and get a live Starlight-powered docs site from your existing Markdown and MDX files — no framework setup, no configuration required.
+
+The npm package has moved from `fea-docs` to `@fea-docs/cli`. The installed command remains `fea-docs`, so existing CLI commands such as `fea-docs start`, `fea-docs build`, and `fea-docs setup gh-pages` continue to work.
 
 ## Features
 
@@ -25,44 +27,44 @@ Run `npx fea-docs@latest start` from any directory and get a live Starlight-powe
 
 ## Usage
 
-> Always use `npx fea-docs@latest` to ensure you get the newest version. Without `@latest`, npx may use a previously cached version.
+> Always use `npx @fea-docs/cli@latest` to ensure you get the newest version. Without `@latest`, npx may use a previously cached version.
 
 ```sh
 # Start a live preview from the current directory
-npx fea-docs@latest start
+npx @fea-docs/cli@latest start
 
 # Start on a specific port and open the browser
-npx fea-docs@latest start --port 3000 --open
+npx @fea-docs/cli@latest start --port 3000 --open
 
 # Start with a custom base path (for subpath hosting)
-npx fea-docs@latest start --base /my-repo
+npx @fea-docs/cli@latest start --base /my-repo
 
 # Build static output for deployment
-npx fea-docs@latest build --out-dir ./dist
+npx @fea-docs/cli@latest build --out-dir ./dist
 
 # Build static output for GitHub Pages project site
-npx fea-docs@latest build --out-dir ./dist --base /my-repo
+npx @fea-docs/cli@latest build --out-dir ./dist --base /my-repo
 
 # Bootstrap GitHub Pages deployment
-npx fea-docs@latest setup gh-pages
+npx @fea-docs/cli@latest setup gh-pages
 
 # Bootstrap GitHub Pages deployment with base path
-npx fea-docs@latest setup gh-pages --base /my-repo
+npx @fea-docs/cli@latest setup gh-pages --base /my-repo
 
 # Enable strict validation (default in build mode)
-npx fea-docs@latest start --strict
+npx @fea-docs/cli@latest start --strict
 
 # Enable a framework adapter
-npx fea-docs@latest start --framework react
+npx @fea-docs/cli@latest start --framework react
 
 # Share via Tailscale (requires explicit --expose consent)
-npx fea-docs@latest start --tailscale-serve --expose
+npx @fea-docs/cli@latest start --tailscale-serve --expose
 
 # Prevent macOS sleep during a long session
-npx fea-docs@latest start --caffeinate
+npx @fea-docs/cli@latest start --caffeinate
 
 # Use both together (macOS + Tailscale sharing)
-npx fea-docs@latest start --caffeinate --tailscale-serve --expose
+npx @fea-docs/cli@latest start --caffeinate --tailscale-serve --expose
 ```
 
 ### Port precedence
@@ -107,32 +109,33 @@ The [`example/`](./example/) directory contains a minimal repository you can use
 
 ```sh
 cd example
-npx fea-docs@latest start
+npx @fea-docs/cli@latest start
 ```
 
 ## Requirements
 
 - Node.js 18 or later
 - npm (used to install the ephemeral Starlight runtime on first run)
+- pnpm for repository development
 
 ## Contributing
 
 ```sh
 git clone https://github.com/your-org/fea-docs
 cd fea-docs
-npm install
+pnpm install
 
 # Type-check
-npm run typecheck
+pnpm run typecheck
 
 # Run tests
-npm test
+pnpm test
 
 # Watch mode
-npm run test:watch
+pnpm run test:watch
 
 # Compile
-npm run build
+pnpm run build
 ```
 
 ### Running locally
@@ -140,8 +143,8 @@ npm run build
 After building, link the package globally so you can invoke `fea-docs` directly:
 
 ```sh
-npm run build
-npm link
+pnpm --filter @fea-docs/cli run build
+pnpm --dir packages/cli link --global
 
 # Run against any directory on your machine
 cd /path/to/your/project
@@ -151,45 +154,65 @@ fea-docs start
 Alternatively, run without linking using `node`:
 
 ```sh
-npm run build
-node dist/cli.js start
+pnpm --filter @fea-docs/cli run build
+node packages/cli/dist/cli.js start
 ```
 
 To test changes without rebuilding every time, use watch mode alongside `node`:
 
 ```sh
 # Terminal 1 — recompile on save
-npm run dev
+pnpm run dev
 
 # Terminal 2 — run the CLI
-node dist/cli.js start
+node packages/cli/dist/cli.js start
 ```
 
 When you are done, remove the global link:
 
 ```sh
-npm unlink -g fea-docs
+pnpm remove --global @fea-docs/cli
 ```
 
 ### Project structure
 
 ```
-src/
-  cli.ts                     Entry point (bin)
-  types.ts                   Shared TypeScript types
-  config/resolver.ts         Config merge (CLI > env > file > defaults)
-  content-graph/             File discovery and page parsing
-  navigation/                NavTree builder
-  link-asset/                Link and asset resolver
-  strict/                    CI validation rules
-  runtime/                   Ephemeral Starlight app lifecycle
-  build/                     Static asset export
-  gh-pages/                  GitHub Pages workflow generator
-  cache/                     Session fingerprint cache
-  cli/commands/              start, build, setup subcommands
+package.json                 Private workspace metadata
+pnpm-workspace.yaml          pnpm workspace packages
+packages/
+  cli/                       @fea-docs/cli package and source
+    src/
+      cli.ts                 Entry point (bin)
+      types.ts               Shared TypeScript types
+      config/resolver.ts     Config merge (CLI > env > file > defaults)
+      content-graph/         File discovery and page parsing
+      navigation/            NavTree builder
+      link-asset/            Link and asset resolver
+      strict/                CI validation rules
+      runtime/               Ephemeral Starlight app lifecycle
+      build/                 Static asset export
+      gh-pages/              GitHub Pages workflow generator
+      cache/                 Session fingerprint cache
+      cli/commands/          start, build, setup subcommands
+  schema/                    Shared artifact TypeScript types
+  normalizer/                Source-vault normalization layer
+  syntax-engine/             Reusable syntax normalization engine
+  obsidian/                  Obsidian syntax handlers
 ```
 
-Tests live alongside source in `src/__tests__/` and cover all deep modules through their public interfaces.
+Tests live alongside source in `packages/cli/src/__tests__/` and cover all deep modules through their public interfaces.
+
+### Package responsibilities
+
+`@fea-docs/cli` is the renamed public CLI and rendering layer. It owns user-facing commands and the Starlight preview/build runtime, while preserving the `fea-docs` executable name for compatibility.
+
+`@fea-docs/normalizer` will prepare source vault content for rendering by handling discovery, metadata, target filtering, privacy validation, route resolution, generated data files, and normalized docs output.
+
+`@fea-docs/syntax-engine` will provide reusable syntax normalization contracts and handler registration independent of the CLI.
+
+`@fea-docs/obsidian` will provide Obsidian-specific syntax handlers for wikilinks, callouts, embeds, block references, and assets.
+
+`@fea-docs/schema` defines shared TypeScript types for generated artifacts such as `fea-docs.manifest.json`, `fea-docs.diagnostics.json`, `fea-docs.graph.json`, `fea-docs.backlinks.json`, `fea-docs.search.json`, and `fea-docs.publish.json`.
 
 ## License
 

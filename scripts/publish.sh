@@ -16,7 +16,8 @@ TAG="v${VERSION}"
 
 echo "Publishing ${TAG}: ${MESSAGE}"
 
-npm version "$VERSION" --no-git-tag-version
+pnpm version "$VERSION" --no-git-tag-version
+pnpm --dir packages/cli version "$VERSION" --no-git-tag-version
 git add .
 git commit -m "${TAG}: ${MESSAGE}"
 git tag "$TAG"

@@ -18,5 +18,5 @@ component libraries co-located alongside this docs directory:
 ## Start
 
 ```sh
-npx fea-docs@latest start --config fea-docs.config.mjs
+npx @fea-docs/cli@latest start --config fea-docs.config.mjs
 ```

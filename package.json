@@ -1,61 +1,17 @@
 {
-  "name": "fea-docs",
+  "name": "fea-docs-monorepo",
   "version": "2.1.0",
-  "description": "Zero-config Starlight docs from any directory",
-  "type": "module",
-  "bin": {
-    "fea-docs": "dist/cli.js"
-  },
-  "main": "./dist/index.js",
-  "exports": {
-    ".": "./dist/index.js"
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
+  "private": true,
+  "description": "fea-docs package workspace",
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint src --ext .ts",
-    "prepublishOnly": "npm run build"
-  },
-  "dependencies": {
-    "chokidar": "^3.6.0",
-    "commander": "^12.1.0",
-    "fast-glob": "^3.3.2",
-    "ignore": "^5.3.2",
-    "js-yaml": "^4.1.0",
-    "open": "^10.1.0",
-    "picocolors": "^1.1.0",
-    "unified": "^11.0.5",
-    "remark-parse": "^11.0.0",
-    "remark-frontmatter": "^5.0.0",
-    "gray-matter": "^4.0.3"
-  },
-  "devDependencies": {
-    "@types/js-yaml": "^4.0.9",
-    "@types/node": "^20.14.0",
-    "typescript": "^5.5.0",
-    "vitest": "^1.6.0"
+    "build": "pnpm --filter './packages/**' -r --sort run build",
+    "dev": "pnpm --filter @fea-docs/cli run dev",
+    "test": "pnpm --filter @fea-docs/cli run test",
+    "test:watch": "pnpm --filter @fea-docs/cli run test:watch",
+    "typecheck": "pnpm --filter './packages/**' -r --sort run build && pnpm --filter './packages/**' -r --sort run typecheck",
+    "lint": "pnpm --filter @fea-docs/cli run lint"
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "keywords": [
-    "docs",
-    "starlight",
-    "astro",
-    "markdown",
-    "documentation"
-  ],
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/fea-lib/fea-docs.git"
   }
 }
