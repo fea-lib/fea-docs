@@ -127,12 +127,30 @@ export interface FeaDocsPublishDestination {
   path: string;
 }
 
+/** Result of pushing one artifact directory to a git destination. */
+export interface FeaDocsPublishedRef {
+  destination: FeaDocsPublishDestination;
+  /** Git commit SHA after a successful commit. Absent when skipped or failed. */
+  sha?: string;
+  /** True when the destination was already up-to-date and no commit was needed. */
+  skipped: boolean;
+  reason?: string;
+}
+
 export interface FeaDocsPublishSummary {
   version: 1;
   targetId: string;
   generatedAt: string;
+  /** Configured destination for the normalized docs artifact. */
   normalizedDocs?: FeaDocsPublishDestination;
+  /** Configured destination for the static output artifact. */
   staticOutput?: FeaDocsPublishDestination;
+  /** Actual publication result for the normalized docs artifact. */
+  normalizedDocsRef?: FeaDocsPublishedRef;
+  /** Actual publication result for the static output artifact. */
+  staticOutputRef?: FeaDocsPublishedRef;
   status: 'success' | 'failed';
+  /** Per-step error message when status is 'failed'. */
+  error?: string;
   diagnostics: FeaDocsDiagnostic[];
 }

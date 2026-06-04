@@ -728,18 +728,18 @@ Add the internal publishing workflow behind `fea-docs publish --target <target>`
 
 ### Acceptance Criteria
 
-- [ ] Publishing runs for one selected target at a time.
-- [ ] Publish-all mode discovers all configured publishing targets and invokes the target-specific pipeline for each one.
-- [ ] Publish-all mode may run sequentially in the first version.
-- [ ] Publish-all mode reports per-target success and failure.
-- [ ] Normalized docs can be published to a configured repo, branch, and path.
-- [ ] Static output can be published to a configured repo, branch, and path.
-- [ ] Normalized docs and static output destinations can be different.
-- [ ] Publishing refuses unknown target IDs and missing destination config in strict mode.
-- [ ] Publish-all mode continues or stops after a target failure according to documented strict-mode behavior.
-- [ ] Publishing does not push private or cross-target normalized docs, assets, graph data, backlinks, or search content.
-- [ ] Publishing produces `fea-docs.publish.json` with destination refs and artifact paths.
-- [ ] Tests cover same-repo destinations, separate-repo destinations, publish-all sequencing, per-target failure summaries, missing destination config, and private/cross-target artifact prevention.
+- [x] Publishing runs for one selected target at a time.
+- [x] Publish-all mode discovers all configured publishing targets and invokes the target-specific pipeline for each one.
+- [x] Publish-all mode may run sequentially in the first version.
+- [x] Publish-all mode reports per-target success and failure.
+- [x] Normalized docs can be published to a configured repo, branch, and path.
+- [x] Static output can be published to a configured repo, branch, and path.
+- [x] Normalized docs and static output destinations can be different.
+- [x] Publishing refuses unknown target IDs and missing destination config in strict mode.
+- [x] Publish-all mode continues or stops after a target failure according to documented strict-mode behavior.
+- [x] Publishing does not push private or cross-target normalized docs, assets, graph data, backlinks, or search content.
+- [x] Publishing produces `fea-docs.publish.json` with destination refs and artifact paths.
+- [x] Tests cover same-repo destinations, separate-repo destinations, publish-all sequencing, per-target failure summaries, missing destination config, and private/cross-target artifact prevention.
 
 ## Phase 12: Strict CI, Diagnostics, and Build Hardening
 
