@@ -53,9 +53,11 @@ async function publishTarget(config: ResolvedConfig, targetId: string, configure
     sourceRoot: config.root,
     outputRoot: normalizedOutput,
     targetId,
-    strict: config.strict,
+    strict: config.obsidian?.strict ?? config.strict,
     configuredTargets,
-    ignore: config.ignore,
+    ignore: [...(config.ignore ?? []), ...(config.obsidian?.ignorePaths ?? [])],
+    publicAssetDirs: config.obsidian?.publicAssetDirs,
+    features: config.obsidian?.features,
   });
 
   const summary: FeaDocsPublishSummary = {

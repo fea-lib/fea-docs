@@ -15,6 +15,26 @@ export default {
   },
   obsidian: {
     enabled: true,
+
+    // Default target when --target is not supplied to CLI commands.
+    selectedTarget: 'engineering',
+
+    // Per-feature toggles (all default to true when enabled: true).
+    features: {
+      wikilinks: true,
+      embeds: true,
+      callouts: true,
+      backlinks: true,
+      graph: true,
+      targetAllowlisting: true,
+    },
+
+    // Additional globs excluded from discovery (on top of defaults).
+    ignorePaths: [],
+
+    // Asset directories always included regardless of page references.
+    publicAssetDirs: ['assets'],
+
     targets: {
       engineering: {
         label: 'Engineering',

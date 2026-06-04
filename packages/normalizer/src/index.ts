@@ -17,6 +17,19 @@ const createIgnore: () => ReturnType<typeof ignoreLib['default']> = (ignoreLib a
 
 export type NormalizeMode = 'development' | 'production';
 
+/**
+ * Per-feature toggles for Obsidian normalization.
+ * All features default to true unless explicitly set to false.
+ */
+export interface NormalizeFeatures {
+  wikilinks?: boolean;
+  embeds?: boolean;
+  callouts?: boolean;
+  backlinks?: boolean;
+  graph?: boolean;
+  targetAllowlisting?: boolean;
+}
+
 export interface NormalizeOptions {
   sourceRoot: string;
   outputRoot: string;
@@ -28,6 +41,11 @@ export interface NormalizeOptions {
   ignore?: string[];
   /** Explicit public asset directories (relative to sourceRoot) always copied regardless of references. */
   publicAssetDirs?: string[];
+  /**
+   * Per-feature toggles. All features default to enabled when not specified.
+   * Set individual features to false to disable the corresponding normalization step.
+   */
+  features?: NormalizeFeatures;
 }
 
 export interface NormalizeResult {
@@ -305,8 +323,9 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
   const allPageIndex = buildPageIndex(allPageRefs);
   const allPageMetaByRoute = new Map(allPageMetas.map((m) => [m.route, m]));
 
-  // Build the syntax engine with Obsidian handlers (callouts enabled by default).
-  const syntaxEngine = createSyntaxEngine(createObsidianHandlers({ callouts: true }));
+  // Build the syntax engine with Obsidian handlers (callouts enabled unless disabled via features).
+  const calloutsEnabled = options.features?.callouts !== false;
+  const syntaxEngine = createSyntaxEngine(createObsidianHandlers({ callouts: calloutsEnabled }));
 
   // Collect graph edges from wikilink resolution across all pages.
   const allGraphEdges: FeaDocsGraphEdge[] = [];
@@ -328,58 +347,64 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
   // Pass 1: Wikilinks + callouts → build transformedPages map.
   // ---------------------------------------------------------------------------
   const transformedPages = new Map<string, string>();
+  const wikilinksEnabled = options.features?.wikilinks !== false;
 
   for (const page of pages) {
-    const { content: transformed, edges, diagnostics: wikilinkDiags } = transformWikilinks(
-      page.rawContent,
-      page.relativePath,
-      page.route,
-      pageIndex,
-      options.strict ?? false,
-    );
+    let transformed = page.rawContent;
 
-    // Surface wikilink diagnostics, reclassifying unresolved links that point
-    // to private or cross-target pages with more specific diagnostic codes.
-    for (const d of wikilinkDiags) {
-      if (d.code === 'UNRESOLVED_WIKILINK' && d.wikilinkTarget) {
-        const occurrence: WikilinkOccurrence = {
-          raw: `[[${d.wikilinkTarget}]]`,
-          target: d.wikilinkTarget,
-          fragment: null,
-          pipeAlias: null,
-        };
-        const allResolution = resolveWikilink(occurrence, allPageIndex);
-        if (allResolution.status === 'resolved') {
-          const meta = allPageMetaByRoute.get(allResolution.page.route);
-          if (meta) {
-            if (meta.publishTargets.length === 0 || meta.isExplicitlyPrivate) {
-              addDiagnostic(
-                'PRIVATE_PAGE_LINK',
-                options.strict ? 'error' : 'warning',
-                `Wikilink [[${d.wikilinkTarget}]] references a private page ("${allResolution.page.relativePath}") not published to any target.`,
-                d.sourcePath,
-                'Remove the link or add the target page to a configured publishing target.',
-                d.location,
-              );
-              continue;
-            } else if (!meta.publishTargets.includes(options.targetId)) {
-              addDiagnostic(
-                'CROSS_TARGET_PAGE_LINK',
-                options.strict ? 'error' : 'warning',
-                `Wikilink [[${d.wikilinkTarget}]] references a page ("${allResolution.page.relativePath}") assigned to a different target (${meta.publishTargets.join(', ')}).`,
-                d.sourcePath,
-                `Add "${options.targetId}" to the target page's publish frontmatter or remove the link.`,
-                d.location,
-              );
-              continue;
+    if (wikilinksEnabled) {
+      const { content: wikiTransformed, edges, diagnostics: wikilinkDiags } = transformWikilinks(
+        page.rawContent,
+        page.relativePath,
+        page.route,
+        pageIndex,
+        options.strict ?? false,
+      );
+
+      // Surface wikilink diagnostics, reclassifying unresolved links that point
+      // to private or cross-target pages with more specific diagnostic codes.
+      for (const d of wikilinkDiags) {
+        if (d.code === 'UNRESOLVED_WIKILINK' && d.wikilinkTarget) {
+          const occurrence: WikilinkOccurrence = {
+            raw: `[[${d.wikilinkTarget}]]`,
+            target: d.wikilinkTarget,
+            fragment: null,
+            pipeAlias: null,
+          };
+          const allResolution = resolveWikilink(occurrence, allPageIndex);
+          if (allResolution.status === 'resolved') {
+            const meta = allPageMetaByRoute.get(allResolution.page.route);
+            if (meta) {
+              if (meta.publishTargets.length === 0 || meta.isExplicitlyPrivate) {
+                addDiagnostic(
+                  'PRIVATE_PAGE_LINK',
+                  options.strict ? 'error' : 'warning',
+                  `Wikilink [[${d.wikilinkTarget}]] references a private page ("${allResolution.page.relativePath}") not published to any target.`,
+                  d.sourcePath,
+                  'Remove the link or add the target page to a configured publishing target.',
+                  d.location,
+                );
+                continue;
+              } else if (!meta.publishTargets.includes(options.targetId)) {
+                addDiagnostic(
+                  'CROSS_TARGET_PAGE_LINK',
+                  options.strict ? 'error' : 'warning',
+                  `Wikilink [[${d.wikilinkTarget}]] references a page ("${allResolution.page.relativePath}") assigned to a different target (${meta.publishTargets.join(', ')}).`,
+                  d.sourcePath,
+                  `Add "${options.targetId}" to the target page's publish frontmatter or remove the link.`,
+                  d.location,
+                );
+                continue;
+              }
             }
           }
         }
+        addDiagnostic(d.code, d.severity, d.message, d.sourcePath, d.suggestion, d.location);
       }
-      addDiagnostic(d.code, d.severity, d.message, d.sourcePath, d.suggestion, d.location);
-    }
 
-    allGraphEdges.push(...edges);
+      allGraphEdges.push(...edges);
+      transformed = wikiTransformed;
+    }
 
     // Apply syntax normalization (callouts, etc.) via the syntax engine.
     const syntaxResult = await syntaxEngine.transform({
@@ -412,34 +437,41 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
   // ---------------------------------------------------------------------------
   const allStaticFilesSet = new Set(allStaticFiles.map((f) => f.replace(/\\/g, '/')));
   const expandCache = new Map<string, string>();
+  const embedsEnabled = options.features?.embeds !== false;
 
   for (const page of pages) {
     const afterPass1 = transformedPages.get(page.relativePath)!;
+    let finalContent: string;
 
-    // Expand ![[...]] embed references.
-    const embedResult = expandEmbeds(afterPass1, {
-      sourcePath: page.relativePath,
-      sourceRoute: page.route,
-      targetId: options.targetId,
-      strict: options.strict ?? false,
-      transformedPages,
-      pageIndex,
-      allPageIndex,
-      allPageMetaByPath,
-      allStaticFilesSet,
-      resolvingStack: [],
-      expandCache,
-    });
+    if (embedsEnabled) {
+      // Expand ![[...]] embed references.
+      const embedResult = expandEmbeds(afterPass1, {
+        sourcePath: page.relativePath,
+        sourceRoute: page.route,
+        targetId: options.targetId,
+        strict: options.strict ?? false,
+        transformedPages,
+        pageIndex,
+        allPageIndex,
+        allPageMetaByPath,
+        allStaticFilesSet,
+        resolvingStack: [],
+        expandCache,
+      });
 
-    for (const ed of embedResult.diagnostics) {
-      addDiagnostic(ed.code, ed.severity, ed.message, ed.sourcePath, ed.suggestion, ed.location);
+      for (const ed of embedResult.diagnostics) {
+        addDiagnostic(ed.code, ed.severity, ed.message, ed.sourcePath, ed.suggestion, ed.location);
+      }
+
+      // Collect embed-derived graph edges.
+      allGraphEdges.push(...embedResult.edges);
+
+      // Inject block anchors (^block-id → <span id="block-id"></span>).
+      finalContent = injectBlockAnchors(embedResult.content);
+    } else {
+      // Embeds disabled: still inject block anchors but skip embed expansion.
+      finalContent = injectBlockAnchors(afterPass1);
     }
-
-    // Collect embed-derived graph edges.
-    allGraphEdges.push(...embedResult.edges);
-
-    // Inject block anchors (^block-id → <span id="block-id"></span>).
-    const finalContent = injectBlockAnchors(embedResult.content);
 
     // Write final content.
     const outputFilePath = path.join(outputRoot, page.outputPath);

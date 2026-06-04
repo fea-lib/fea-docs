@@ -706,17 +706,17 @@ Expose a small Obsidian compatibility config surface, publishing target definiti
 
 ### Acceptance Criteria
 
-- [ ] Config can enable or disable wikilinks, embeds, callouts, backlinks, graph output, and explicit target-based publish allowlisting.
-- [ ] Config can define publishing targets, selected/default target, public roots, ignored paths, public asset directories, normalized docs destinations, static output destinations, and strictness behavior.
-- [ ] Each publishing target can define separate repo, branch, and path settings for normalized docs and static output.
-- [ ] Obsidian compatibility defaults to publishing nothing unless pages opt into a configured publishing target.
-- [ ] Defaults preserve existing non-Obsidian `fea-docs` usage when Obsidian compatibility is not enabled.
-- [ ] Documentation explains recommended Obsidian settings and `.mdx` plugin caveats.
-- [ ] Documentation recommends standard Markdown links where possible.
-- [ ] Documentation lists supported and unsupported Obsidian syntax.
-- [ ] Documentation warns that build filtering does not make a public source repository private.
-- [ ] Documentation warns that normalized docs are published artifacts and must be treated like static output.
-- [ ] Example content demonstrates each supported feature.
+- [x] Config can enable or disable wikilinks, embeds, callouts, backlinks, graph output, and explicit target-based publish allowlisting.
+- [x] Config can define publishing targets, selected/default target, public roots, ignored paths, public asset directories, normalized docs destinations, static output destinations, and strictness behavior.
+- [x] Each publishing target can define separate repo, branch, and path settings for normalized docs and static output.
+- [x] Obsidian compatibility defaults to publishing nothing unless pages opt into a configured publishing target.
+- [x] Defaults preserve existing non-Obsidian `fea-docs` usage when Obsidian compatibility is not enabled.
+- [x] Documentation explains recommended Obsidian settings and `.mdx` plugin caveats.
+- [x] Documentation recommends standard Markdown links where possible.
+- [x] Documentation lists supported and unsupported Obsidian syntax.
+- [x] Documentation warns that build filtering does not make a public source repository private.
+- [x] Documentation warns that normalized docs are published artifacts and must be treated like static output.
+- [x] Example content demonstrates each supported feature.
 
 ## Phase 11: Target Publishing Workflow
 

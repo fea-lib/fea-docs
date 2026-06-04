@@ -82,8 +82,57 @@ export interface PublishTargetConfig {
   staticOutput?: PublishDestinationConfig;
 }
 
+/**
+ * Per-feature toggles for Obsidian compatibility.
+ * All features default to true when `obsidian.enabled` is true.
+ * Set a feature to false to disable the corresponding normalization step.
+ */
+export interface ObsidianFeatures {
+  /** Resolve `[[wikilinks]]` to standard Markdown links. Default: true. */
+  wikilinks?: boolean;
+  /** Expand `![[embeds]]` (note, heading, block, asset). Default: true. */
+  embeds?: boolean;
+  /** Normalize `> [!callout]` syntax to Starlight asides. Default: true. */
+  callouts?: boolean;
+  /** Generate and render backlink data. Default: true. */
+  backlinks?: boolean;
+  /** Emit `fea-docs.graph.json` for the graph view. Default: true. */
+  graph?: boolean;
+  /**
+   * Require explicit target allowlisting via frontmatter `publish`.
+   * When true (the default), nothing is public unless it names a configured target.
+   * Set to false only if you want all pages to be public without explicit opt-in
+   * (not recommended).
+   */
+  targetAllowlisting?: boolean;
+}
+
 export interface ObsidianConfig {
+  /** Enable Obsidian-compatible vault normalization. Default: false. */
   enabled?: boolean;
+  /**
+   * Per-feature toggles. All features default to enabled when `obsidian.enabled` is true.
+   */
+  features?: ObsidianFeatures;
+  /**
+   * The default publishing target ID used when `--target` is not supplied to CLI commands.
+   * Must match a key in `targets`.
+   */
+  selectedTarget?: string;
+  /**
+   * Paths relative to the source root that are always included as public assets
+   * regardless of whether they are referenced by target-public pages.
+   * E.g. `['assets/public']`
+   */
+  publicAssetDirs?: string[];
+  /**
+   * Additional glob patterns to ignore during discovery (on top of defaults and
+   * the top-level `ignore` array).
+   */
+  ignorePaths?: string[];
+  /** Fail on strict diagnostics. Overrides the top-level `strict` flag for Obsidian builds. */
+  strict?: boolean;
+  /** Publishing target definitions. */
   targets?: Record<string, PublishTargetConfig>;
 }
 

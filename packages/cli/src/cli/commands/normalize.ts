@@ -9,7 +9,7 @@ import type { ResolvedConfig } from '../../types.js';
 export function normalizeCommand(): Command {
   return new Command('normalize')
     .description('Normalize an Obsidian-style source vault for one publishing target')
-    .requiredOption('--target <target>', 'Publishing target ID')
+    .option('--target <target>', 'Publishing target ID')
     .option('--out-dir <path>', 'Normalized docs output directory')
     .option('--config <path>', 'Path to an explicit config file')
     .option('--root <path>', 'Source docs root')
@@ -20,7 +20,11 @@ export function normalizeCommand(): Command {
         ...(opts.strict ? { strict: true } : {}),
       };
       const config = await resolveConfig(cliFlags, opts.config);
-      const targetId = String(opts.target);
+      const targetId = String(opts.target ?? config.obsidian?.selectedTarget ?? '');
+      if (!targetId) {
+        console.error(pc.red('Error:'), 'Pass --target <target> or set obsidian.selectedTarget in config.');
+        process.exit(1);
+      }
       const outputRoot = path.resolve(
         opts.outDir ? String(opts.outDir) : defaultNormalizedOutput(config.root, targetId),
       );
@@ -31,9 +35,11 @@ export function normalizeCommand(): Command {
           sourceRoot: config.root,
           outputRoot,
           targetId,
-          strict: config.strict,
+          strict: config.obsidian?.strict ?? config.strict,
           configuredTargets: targets,
-          ignore: config.ignore,
+          ignore: [...(config.ignore ?? []), ...(config.obsidian?.ignorePaths ?? [])],
+          publicAssetDirs: config.obsidian?.publicAssetDirs,
+          features: config.obsidian?.features,
         });
 
         // Render backlinks into eligible pages (those with backlinks: true).
