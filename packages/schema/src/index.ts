@@ -154,3 +154,68 @@ export interface FeaDocsPublishSummary {
   error?: string;
   diagnostics: FeaDocsDiagnostic[];
 }
+
+export interface FeaDocsArtifactSchema {
+  artifact: ArtifactKind;
+  version: 1;
+  required: string[];
+}
+
+export const artifactSchemas = {
+  diagnostics: {
+    artifact: 'diagnostics',
+    version: 1,
+    required: ['version', 'generatedAt', 'diagnostics'],
+  },
+  manifest: {
+    artifact: 'manifest',
+    version: 1,
+    required: ['version', 'targetId', 'generatedAt', 'pages', 'assets', 'staticFiles', 'generatedDataFiles', 'diagnostics'],
+  },
+  graph: {
+    artifact: 'graph',
+    version: 1,
+    required: ['version', 'targetId', 'nodes', 'edges'],
+  },
+  backlinks: {
+    artifact: 'backlinks',
+    version: 1,
+    required: ['version', 'targetId', 'pages'],
+  },
+  search: {
+    artifact: 'search',
+    version: 1,
+    required: ['version', 'targetId', 'pages'],
+  },
+  publish: {
+    artifact: 'publish',
+    version: 1,
+    required: ['version', 'targetId', 'generatedAt', 'status', 'diagnostics'],
+  },
+} as const satisfies Record<ArtifactKind, FeaDocsArtifactSchema>;
+
+export function countDiagnostics(diagnostics: FeaDocsDiagnostic[]): FeaDocsManifest['diagnostics'] {
+  return {
+    info: diagnostics.filter((d) => d.severity === 'info').length,
+    warnings: diagnostics.filter((d) => d.severity === 'warning').length,
+    errors: diagnostics.filter((d) => d.severity === 'error').length,
+  };
+}
+
+export function isFeaDocsDiagnostic(value: unknown): value is FeaDocsDiagnostic {
+  if (!value || typeof value !== 'object') return false;
+  const diagnostic = value as Record<string, unknown>;
+  return (
+    typeof diagnostic.code === 'string'
+    && (diagnostic.severity === 'info' || diagnostic.severity === 'warning' || diagnostic.severity === 'error')
+    && typeof diagnostic.message === 'string'
+    && (diagnostic.sourcePath === undefined || typeof diagnostic.sourcePath === 'string')
+    && (diagnostic.suggestion === undefined || typeof diagnostic.suggestion === 'string')
+  );
+}
+
+export function isFeaDocsDiagnosticsFile(value: unknown): value is FeaDocsDiagnosticsFile {
+  if (!value || typeof value !== 'object') return false;
+  const file = value as Record<string, unknown>;
+  return file.version === 1 && typeof file.generatedAt === 'string' && Array.isArray(file.diagnostics) && file.diagnostics.every(isFeaDocsDiagnostic);
+}

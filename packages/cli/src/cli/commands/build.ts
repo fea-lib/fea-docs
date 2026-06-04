@@ -1,11 +1,13 @@
 import { Command } from 'commander';
 import pc from 'picocolors';
+import fs from 'node:fs';
 import path from 'node:path';
 import { inferConfigFromDocs, resolveConfig } from '../../config/resolver.js';
 import { ContentGraphEngine } from '../../content-graph/engine.js';
 import { RuntimeAdapter } from '../../runtime/adapter.js';
 import { StrictValidator } from '../../strict/validator.js';
 import { inferFrameworksFromMdxGraph } from '../../mdx-framework/inferer.js';
+import { buildDiagnostic, printDiagnosticSummary, writeDiagnosticsFile } from '../../diagnostics/summary.js';
 import type { ResolvedConfig } from '../../types.js';
 
 export function buildCommand(): Command {
@@ -31,6 +33,7 @@ export function buildCommand(): Command {
 
       const config = await resolveConfig(cliFlags, opts.config);
 
+      const outDir = path.resolve(opts.outDir);
       try {
         console.log(pc.cyan('Scanning for docs...'));
         const engine = new ContentGraphEngine(config);
@@ -82,8 +85,20 @@ export function buildCommand(): Command {
           console.log(`${prefix}${location} ${diag.message}`);
         }
 
+        const diagnostics = result.diagnostics.map((diag) => ({
+          code: diag.code,
+          severity: diag.type === 'error' ? 'error' as const : 'warning' as const,
+          message: diag.message,
+          ...(diag.file ? { sourcePath: diag.file } : {}),
+          ...(diag.line ? { location: { line: diag.line } } : {}),
+          suggestion: diagnosticSuggestion(diag.code),
+        }));
+
         if (!result.passed) {
           console.error(pc.red('\nBuild failed: strict validation errors found.'));
+          fs.rmSync(outDir, { recursive: true, force: true });
+          writeDiagnosticsFile(outDir, diagnostics);
+          printDiagnosticSummary(diagnostics);
           process.exit(1);
         }
 
@@ -92,14 +107,40 @@ export function buildCommand(): Command {
         await adapter.materialize();
         console.log(pc.cyan(`Runtime cache dir: ${adapter.runtimeDir}`));
 
-        const outDir = path.resolve(opts.outDir);
         console.log(pc.cyan(`Building to ${outDir}...`));
+        fs.rmSync(outDir, { recursive: true, force: true });
         await adapter.runBuild(outDir);
 
+        writeDiagnosticsFile(outDir, diagnostics);
+        printDiagnosticSummary(diagnostics);
         console.log(pc.green(`\nBuild complete: ${outDir}`));
       } catch (err) {
-        console.error(pc.red('Error:'), err instanceof Error ? err.message : String(err));
+        const message = err instanceof Error ? err.message : String(err);
+        const diagnostic = buildDiagnostic({
+          code: 'BUILD_ERROR',
+          message,
+          suggestion: 'Fix the reported build, MDX import, or framework configuration error and run the build again.',
+        });
+        fs.rmSync(outDir, { recursive: true, force: true });
+        writeDiagnosticsFile(outDir, [diagnostic]);
+        console.error(pc.red('Error:'), message);
+        printDiagnosticSummary([diagnostic]);
         process.exit(1);
       }
     });
+}
+
+function diagnosticSuggestion(code: string): string {
+  switch (code) {
+    case 'DUPLICATE_SLUG':
+      return 'Rename one page or configure a unique route/slug.';
+    case 'MISSING_LABEL':
+      return 'Add a frontmatter title or H1 heading.';
+    case 'FRONTMATTER_SCHEMA_ERROR':
+      return 'Fix the frontmatter value type.';
+    case 'MDX_IMPORT_UNRESOLVED':
+      return 'Fix the import path or configure the missing alias/framework integration.';
+    default:
+      return 'Fix the reported validation issue and run the build again.';
+  }
 }

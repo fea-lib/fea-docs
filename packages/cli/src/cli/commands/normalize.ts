@@ -4,6 +4,7 @@ import pc from 'picocolors';
 import { normalizeVault } from '@fea-docs/normalizer';
 import { renderBacklinks } from '../../backlinks/renderer.js';
 import { resolveConfig } from '../../config/resolver.js';
+import { printDiagnosticSummary } from '../../diagnostics/summary.js';
 import type { ResolvedConfig } from '../../types.js';
 
 export function normalizeCommand(): Command {
@@ -49,6 +50,7 @@ export function normalizeCommand(): Command {
         if (backlinkResult.pagesRendered > 0) {
           console.log(pc.cyan(`Backlinks rendered on ${backlinkResult.pagesRendered} page(s).`));
         }
+        printDiagnosticSummary(result.diagnostics.diagnostics);
         console.log(pc.cyan(`Output: ${outputRoot}`));
       } catch (err) {
         console.error(pc.red('Error:'), err instanceof Error ? err.message : String(err));

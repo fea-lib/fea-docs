@@ -751,14 +751,14 @@ Consolidate diagnostics and strict-mode behavior across `@fea-docs/normalizer`, 
 
 ### Acceptance Criteria
 
-- [ ] Diagnostics include source file, location where feasible, issue code, severity, and suggested fix.
-- [ ] Machine-readable diagnostics are emitted to `fea-docs.diagnostics.json`.
-- [ ] Normalize/build/publish output ends with a warning/error summary.
-- [ ] Strict mode fails on unresolved target-public links, unresolved target-public embeds, unresolved target-public assets, duplicate routes/slugs, invalid frontmatter, unknown publish targets, missing title fallback, MDX import errors, ambiguous wikilinks, embed cycles, privacy leaks, and cross-target leaks.
-- [ ] Development mode warns for recoverable issues and keeps the local server usable.
-- [ ] `@fea-docs/schema` exports diagnostics, manifest, graph, backlinks, search report, and publish summary types/schemas for CI and editor integration.
-- [ ] Failed strict normalization, build, or publish runs do not leave private or cross-target artifacts in normalized docs, static output, or destination branches.
-- [ ] End-to-end tests cover strict success, strict failure, dev warnings, publishing failures, and privacy leak prevention.
+- [x] Diagnostics include source file, location where feasible, issue code, severity, and suggested fix.
+- [x] Machine-readable diagnostics are emitted to `fea-docs.diagnostics.json`.
+- [x] Normalize/build/publish output ends with a warning/error summary.
+- [x] Strict mode fails on unresolved target-public links, unresolved target-public embeds, unresolved target-public assets, duplicate routes/slugs, invalid frontmatter, unknown publish targets, missing title fallback, MDX import errors, ambiguous wikilinks, embed cycles, privacy leaks, and cross-target leaks.
+- [x] Development mode warns for recoverable issues and keeps the local server usable.
+- [x] `@fea-docs/schema` exports diagnostics, manifest, graph, backlinks, search report, and publish summary types/schemas for CI and editor integration.
+- [x] Failed strict normalization, build, or publish runs do not leave private or cross-target artifacts in normalized docs, static output, or destination branches.
+- [x] End-to-end tests cover strict success, strict failure, dev warnings, publishing failures, and privacy leak prevention.
 
 ## Phase 13: Performance, Accessibility, and Release Readiness
 

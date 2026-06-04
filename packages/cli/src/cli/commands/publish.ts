@@ -5,6 +5,7 @@ import pc from 'picocolors';
 import { artifactFileNames, type FeaDocsPublishSummary, type FeaDocsDiagnostic } from '@fea-docs/schema';
 import { normalizeVault } from '@fea-docs/normalizer';
 import { resolveConfig } from '../../config/resolver.js';
+import { buildDiagnostic, printDiagnosticSummary } from '../../diagnostics/summary.js';
 import type { ResolvedConfig, PublishDestinationConfig } from '../../types.js';
 import { defaultNormalizedOutput } from './normalize.js';
 import { GitPublisher, resolveGitRoot, type PublishDirResult } from '../../publisher/git-publisher.js';
@@ -59,8 +60,9 @@ export function publishCommand(): Command {
 
       for (const targetId of targets) {
         try {
-          await publishTarget(config, targetId, configuredTargets, publisher, strict);
+          const summary = await publishTarget(config, targetId, configuredTargets, publisher, strict);
           console.log(pc.green(`✓ Published target "${targetId}".`));
+          printDiagnosticSummary(summary.diagnostics);
           results.push({ targetId, status: 'success' });
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
@@ -120,88 +122,109 @@ export async function publishTarget(
 
   const isStrict = strict ?? config.obsidian?.strict ?? config.strict ?? false;
 
-  // Validate destination config in strict mode
-  if (isStrict) {
-    if (!targetConfig.normalizedDocs && !targetConfig.staticOutput) {
+  const normalizedOutput = defaultNormalizedOutput(config.root, targetId);
+  const outDir = path.join(path.dirname(config.root), '.fea-docs', 'publish', targetId);
+
+  try {
+    // Validate destination config in strict mode.
+    if (isStrict && !targetConfig.normalizedDocs && !targetConfig.staticOutput) {
       throw new Error(
         `Target "${targetId}" has no normalizedDocs or staticOutput destination configured.`,
       );
     }
-  }
 
-  // ── Step 1: Normalize ───────────────────────────────────────────────────
-  const normalizedOutput = defaultNormalizedOutput(config.root, targetId);
-  const result = await normalizeVault({
-    sourceRoot: config.root,
-    outputRoot: normalizedOutput,
-    targetId,
-    strict: isStrict,
-    configuredTargets,
-    ignore: [...(config.ignore ?? []), ...(config.obsidian?.ignorePaths ?? [])],
-    publicAssetDirs: config.obsidian?.publicAssetDirs,
-    features: config.obsidian?.features,
-  });
+    // ── Step 1: Normalize ───────────────────────────────────────────────────
+    const result = await normalizeVault({
+      sourceRoot: config.root,
+      outputRoot: normalizedOutput,
+      targetId,
+      strict: isStrict,
+      configuredTargets,
+      ignore: [...(config.ignore ?? []), ...(config.obsidian?.ignorePaths ?? [])],
+      publicAssetDirs: config.obsidian?.publicAssetDirs,
+      features: config.obsidian?.features,
+    });
 
-  const diagnostics: FeaDocsDiagnostic[] = result.diagnostics.diagnostics;
-  let normalizedDocsRef: FeaDocsPublishSummary['normalizedDocsRef'];
-  let staticOutputRef: FeaDocsPublishSummary['staticOutputRef'];
+    const diagnostics: FeaDocsDiagnostic[] = result.diagnostics.diagnostics;
+    let normalizedDocsRef: FeaDocsPublishSummary['normalizedDocsRef'];
+    let staticOutputRef: FeaDocsPublishSummary['staticOutputRef'];
 
-  // ── Step 2: Publish normalized docs ────────────────────────────────────
-  if (targetConfig.normalizedDocs && publisher) {
-    normalizedDocsRef = await publishArtifact(
-      publisher,
-      normalizedOutput,
-      targetConfig.normalizedDocs,
-      `chore(fea-docs): publish normalized docs for ${targetId}`,
-    );
-  } else if (targetConfig.normalizedDocs && !publisher) {
-    normalizedDocsRef = {
-      destination: targetConfig.normalizedDocs,
-      skipped: true,
-      reason: 'no-git-publisher',
+    // ── Step 2: Publish normalized docs ────────────────────────────────────
+    if (targetConfig.normalizedDocs && publisher) {
+      normalizedDocsRef = await publishArtifact(
+        publisher,
+        normalizedOutput,
+        targetConfig.normalizedDocs,
+        `chore(fea-docs): publish normalized docs for ${targetId}`,
+      );
+    } else if (targetConfig.normalizedDocs && !publisher) {
+      normalizedDocsRef = {
+        destination: targetConfig.normalizedDocs,
+        skipped: true,
+        reason: 'no-git-publisher',
+      };
+    }
+
+    // ── Step 3: Publish static output ──────────────────────────────────────
+    if (targetConfig.staticOutput && staticOutputDir && publisher) {
+      staticOutputRef = await publishArtifact(
+        publisher,
+        staticOutputDir,
+        targetConfig.staticOutput,
+        `chore(fea-docs): publish static output for ${targetId}`,
+      );
+    } else if (targetConfig.staticOutput && !staticOutputDir) {
+      staticOutputRef = {
+        destination: targetConfig.staticOutput,
+        skipped: true,
+        reason: 'static-output-not-built',
+      };
+    } else if (targetConfig.staticOutput && !publisher) {
+      staticOutputRef = {
+        destination: targetConfig.staticOutput,
+        skipped: true,
+        reason: 'no-git-publisher',
+      };
+    }
+
+    // ── Step 4: Write publish summary ───────────────────────────────────────
+    const summary: FeaDocsPublishSummary = {
+      version: 1,
+      targetId,
+      generatedAt: new Date().toISOString(),
+      normalizedDocs: targetConfig.normalizedDocs,
+      staticOutput: targetConfig.staticOutput,
+      normalizedDocsRef,
+      staticOutputRef,
+      status: 'success',
+      diagnostics,
     };
-  }
 
-  // ── Step 3: Publish static output ──────────────────────────────────────
-  if (targetConfig.staticOutput && staticOutputDir && publisher) {
-    staticOutputRef = await publishArtifact(
-      publisher,
-      staticOutputDir,
-      targetConfig.staticOutput,
-      `chore(fea-docs): publish static output for ${targetId}`,
-    );
-  } else if (targetConfig.staticOutput && !staticOutputDir) {
-    staticOutputRef = {
-      destination: targetConfig.staticOutput,
-      skipped: true,
-      reason: 'static-output-not-built',
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.writeFileSync(path.join(outDir, artifactFileNames.publish), `${JSON.stringify(summary, null, 2)}\n`);
+
+    return summary;
+  } catch (err) {
+    fs.rmSync(normalizedOutput, { recursive: true, force: true });
+    const message = err instanceof Error ? err.message : String(err);
+    const summary: FeaDocsPublishSummary = {
+      version: 1,
+      targetId,
+      generatedAt: new Date().toISOString(),
+      normalizedDocs: targetConfig.normalizedDocs,
+      staticOutput: targetConfig.staticOutput,
+      status: 'failed',
+      error: message,
+      diagnostics: [buildDiagnostic({
+        code: 'PUBLISH_ERROR',
+        message,
+        suggestion: 'Fix the failed normalize, build, destination, or git publish step and run publish again.',
+      })],
     };
-  } else if (targetConfig.staticOutput && !publisher) {
-    staticOutputRef = {
-      destination: targetConfig.staticOutput,
-      skipped: true,
-      reason: 'no-git-publisher',
-    };
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.writeFileSync(path.join(outDir, artifactFileNames.publish), `${JSON.stringify(summary, null, 2)}\n`);
+    throw err;
   }
-
-  // ── Step 4: Write publish summary ───────────────────────────────────────
-  const summary: FeaDocsPublishSummary = {
-    version: 1,
-    targetId,
-    generatedAt: new Date().toISOString(),
-    normalizedDocs: targetConfig.normalizedDocs,
-    staticOutput: targetConfig.staticOutput,
-    normalizedDocsRef,
-    staticOutputRef,
-    status: 'success',
-    diagnostics,
-  };
-
-  const outDir = path.join(path.dirname(config.root), '.fea-docs', 'publish', targetId);
-  fs.mkdirSync(outDir, { recursive: true });
-  fs.writeFileSync(path.join(outDir, artifactFileNames.publish), `${JSON.stringify(summary, null, 2)}\n`);
-
-  return summary;
 }
 
 // ---------------------------------------------------------------------------

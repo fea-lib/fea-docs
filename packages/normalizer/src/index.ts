@@ -3,7 +3,7 @@ import path from 'node:path';
 import fg from 'fast-glob';
 import matter from 'gray-matter';
 import ignoreLib from 'ignore';
-import { artifactFileNames, type FeaDocsDiagnosticsFile, type FeaDocsGraphEdge, type FeaDocsManifest } from '@fea-docs/schema';
+import { artifactFileNames, countDiagnostics, type FeaDocsDiagnosticsFile, type FeaDocsGraphEdge, type FeaDocsManifest } from '@fea-docs/schema';
 import { createSyntaxEngine } from '@fea-docs/syntax-engine';
 import { createObsidianHandlers } from '@fea-docs/obsidian';
 import { deriveTitle, extractMetadata } from './metadata.js';
@@ -103,6 +103,7 @@ interface AllPageMeta {
 export async function normalizeVault(options: NormalizeOptions): Promise<NormalizeResult> {
   const sourceRoot = path.resolve(options.sourceRoot);
   const outputRoot = path.resolve(options.outputRoot);
+  const workRoot = `${outputRoot}.tmp-${process.pid}-${Date.now()}`;
   const configuredTargets = new Set(options.configuredTargets ?? [options.targetId]);
   const mode: NormalizeMode = options.mode ?? 'production';
   const generatedAt = new Date().toISOString();
@@ -128,8 +129,15 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
     diagnostics.diagnostics.push({ code, severity, message, ...(sourcePath ? { sourcePath } : {}), ...(suggestion ? { suggestion } : {}), ...(location ? { location } : {}) });
   };
 
-  fs.rmSync(outputRoot, { recursive: true, force: true });
-  fs.mkdirSync(outputRoot, { recursive: true });
+  const failStrict = (): never => {
+    fs.rmSync(workRoot, { recursive: true, force: true });
+    fs.rmSync(outputRoot, { recursive: true, force: true });
+    writeJson(path.join(outputRoot, artifactFileNames.diagnostics), diagnostics);
+    throw new Error('Normalization failed due to strict diagnostics.');
+  };
+
+  fs.rmSync(workRoot, { recursive: true, force: true });
+  fs.mkdirSync(workRoot, { recursive: true });
 
   const gitignoreFilter = buildGitignoreFilter(sourceRoot);
   const ignoreGlobs = [...DEFAULT_IGNORE_GLOBS, ...(options.ignore ?? [])];
@@ -280,8 +288,7 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
 
   // Fail early if strict and there are errors.
   if (options.strict && diagnostics.diagnostics.some((d) => d.severity === 'error')) {
-    writeJson(path.join(outputRoot, artifactFileNames.diagnostics), diagnostics);
-    throw new Error('Normalization failed due to strict diagnostics.');
+    failStrict();
   }
 
   // Determine which static files to copy (referenced from public pages + explicit dirs).
@@ -428,8 +435,7 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
 
   // Fail strict builds if wikilink/callout errors were introduced.
   if (options.strict && diagnostics.diagnostics.some((d) => d.severity === 'error')) {
-    writeJson(path.join(outputRoot, artifactFileNames.diagnostics), diagnostics);
-    throw new Error('Normalization failed due to strict diagnostics.');
+    failStrict();
   }
 
   // ---------------------------------------------------------------------------
@@ -474,19 +480,18 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
     }
 
     // Write final content.
-    const outputFilePath = path.join(outputRoot, page.outputPath);
+    const outputFilePath = path.join(workRoot, page.outputPath);
     fs.mkdirSync(path.dirname(outputFilePath), { recursive: true });
     fs.writeFileSync(outputFilePath, finalContent, 'utf-8');
   }
 
   // Fail strict builds if embed errors were introduced.
   if (options.strict && diagnostics.diagnostics.some((d) => d.severity === 'error')) {
-    writeJson(path.join(outputRoot, artifactFileNames.diagnostics), diagnostics);
-    throw new Error('Normalization failed due to strict diagnostics.');
+    failStrict();
   }
 
   for (const staticFile of staticFilesToCopy) {
-    copyFile(path.join(sourceRoot, staticFile), path.join(outputRoot, staticFile));
+    copyFile(path.join(sourceRoot, staticFile), path.join(workRoot, staticFile));
   }
 
   // ---------------------------------------------------------------------------
@@ -511,8 +516,7 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
 
   // Fail strict builds if asset validation errors were introduced.
   if (options.strict && diagnostics.diagnostics.some((d) => d.severity === 'error')) {
-    writeJson(path.join(outputRoot, artifactFileNames.diagnostics), diagnostics);
-    throw new Error('Normalization failed due to strict diagnostics.');
+    failStrict();
   }
 
   const manifest: FeaDocsManifest = {
@@ -542,16 +546,12 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
       artifactFileNames.backlinks,
       artifactFileNames.search,
     ],
-    diagnostics: {
-      info: diagnostics.diagnostics.filter((d) => d.severity === 'info').length,
-      warnings: diagnostics.diagnostics.filter((d) => d.severity === 'warning').length,
-      errors: diagnostics.diagnostics.filter((d) => d.severity === 'error').length,
-    },
+    diagnostics: countDiagnostics(diagnostics.diagnostics),
   };
 
-  writeJson(path.join(outputRoot, artifactFileNames.manifest), manifest);
-  writeJson(path.join(outputRoot, artifactFileNames.diagnostics), diagnostics);
-  writeJson(path.join(outputRoot, artifactFileNames.graph), {
+  writeJson(path.join(workRoot, artifactFileNames.manifest), manifest);
+  writeJson(path.join(workRoot, artifactFileNames.diagnostics), diagnostics);
+  writeJson(path.join(workRoot, artifactFileNames.graph), {
     version: 1,
     targetId: options.targetId,
     nodes: pages.map((page) => ({
@@ -613,8 +613,7 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
       }
     }
     if (diagnostics.diagnostics.some((d) => d.severity === 'error')) {
-      writeJson(path.join(outputRoot, artifactFileNames.diagnostics), diagnostics);
-      throw new Error('Normalization failed due to strict diagnostics.');
+      failStrict();
     }
   }
 
@@ -624,12 +623,12 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
     backlinksPages[route] = entries;
   }
 
-  writeJson(path.join(outputRoot, artifactFileNames.backlinks), {
+  writeJson(path.join(workRoot, artifactFileNames.backlinks), {
     version: 1,
     targetId: options.targetId,
     pages: backlinksPages,
   });
-  writeJson(path.join(outputRoot, artifactFileNames.search), {
+  writeJson(path.join(workRoot, artifactFileNames.search), {
     version: 1,
     targetId: options.targetId,
     pages: pages.map((page) => ({
@@ -639,6 +638,9 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
       ...(page.metadata.pagefind ? {} : { reason: 'pagefind:false' }),
     })),
   });
+
+  fs.rmSync(outputRoot, { recursive: true, force: true });
+  fs.renameSync(workRoot, outputRoot);
 
   return { manifest, diagnostics };
 }
