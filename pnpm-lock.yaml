@@ -50,6 +50,12 @@ importers:
         specifier: ^11.0.5
         version: 11.0.5
     devDependencies:
+      '@fea-docs/obsidian':
+        specifier: workspace:*
+        version: link:../obsidian
+      '@fea-docs/syntax-engine':
+        specifier: workspace:*
+        version: link:../syntax-engine
       '@types/js-yaml':
         specifier: ^4.0.9
         version: 4.0.9
@@ -65,9 +71,15 @@ importers:
 
   packages/normalizer:
     dependencies:
+      '@fea-docs/obsidian':
+        specifier: workspace:*
+        version: link:../obsidian
       '@fea-docs/schema':
         specifier: workspace:*
         version: link:../schema
+      '@fea-docs/syntax-engine':
+        specifier: workspace:*
+        version: link:../syntax-engine
       fast-glob:
         specifier: ^3.3.2
         version: 3.3.3

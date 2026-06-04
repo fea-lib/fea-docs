@@ -4,6 +4,8 @@ import fg from 'fast-glob';
 import matter from 'gray-matter';
 import ignoreLib from 'ignore';
 import { artifactFileNames, type FeaDocsDiagnosticsFile, type FeaDocsGraphEdge, type FeaDocsManifest } from '@fea-docs/schema';
+import { createSyntaxEngine } from '@fea-docs/syntax-engine';
+import { createObsidianHandlers } from '@fea-docs/obsidian';
 import { deriveTitle, extractMetadata } from './metadata.js';
 import { extractAssetReferences, selectStaticFilesToCopy } from './assets.js';
 import { buildPageIndex, resolveWikilink, transformWikilinks, type PageRef, type WikilinkOccurrence } from './wikilinks.js';
@@ -302,6 +304,9 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
   const allPageIndex = buildPageIndex(allPageRefs);
   const allPageMetaByRoute = new Map(allPageMetas.map((m) => [m.route, m]));
 
+  // Build the syntax engine with Obsidian handlers (callouts enabled by default).
+  const syntaxEngine = createSyntaxEngine(createObsidianHandlers({ callouts: true }));
+
   // Collect graph edges from wikilink resolution across all pages.
   const allGraphEdges: FeaDocsGraphEdge[] = [];
 
@@ -358,10 +363,27 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
 
     allGraphEdges.push(...edges);
 
+    // Apply syntax normalization (callouts, etc.) via the syntax engine.
+    const syntaxResult = await syntaxEngine.transform({
+      path: page.relativePath,
+      content: transformed,
+      format: page.format,
+    });
+    for (const sd of syntaxResult.diagnostics) {
+      addDiagnostic(
+        sd.code,
+        sd.severity as 'info' | 'warning' | 'error',
+        sd.message,
+        sd.sourcePath ?? page.relativePath,
+        sd.suggestion,
+      );
+    }
+    const finalContent = syntaxResult.content;
+
     // Write transformed content (may differ from source if wikilinks were resolved).
     const outputFilePath = path.join(outputRoot, page.outputPath);
     fs.mkdirSync(path.dirname(outputFilePath), { recursive: true });
-    fs.writeFileSync(outputFilePath, transformed, 'utf-8');
+    fs.writeFileSync(outputFilePath, finalContent, 'utf-8');
   }
 
   // Fail strict builds if wikilink errors were introduced.

@@ -43,6 +43,8 @@
     "unified": "^11.0.5"
   },
   "devDependencies": {
+    "@fea-docs/obsidian": "workspace:*",
+    "@fea-docs/syntax-engine": "workspace:*",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.14.0",
     "typescript": "^5.5.0",

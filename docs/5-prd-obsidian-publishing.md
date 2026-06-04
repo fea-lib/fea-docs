@@ -607,17 +607,17 @@ Create `@fea-docs/syntax-engine`, register `@fea-docs/obsidian` handlers, and im
 
 ### Acceptance Criteria
 
-- [ ] `@fea-docs/syntax-engine` exposes a clear input/output contract that does not depend on `@fea-docs/cli` internals or publishing destinations.
-- [ ] `@fea-docs/syntax-engine` can register `@fea-docs/obsidian` syntax handlers without coupling them to target filtering, rendering, or publishing modules.
-- [ ] The engine contract is suitable for reuse by future tools such as a VS Code extension for preview, validation, or authoring assistance.
-- [ ] `> [!note]`, `> [!info]`, `> [!tip]`, `> [!warning]`, `> [!danger]`, and `> [!question]` render with predictable styles.
-- [ ] Custom callout titles are preserved.
-- [ ] Markdown inside callout bodies renders correctly.
-- [ ] Nested callouts do not corrupt the surrounding page structure.
-- [ ] Foldable callouts render with accessible semantics or a documented fallback.
-- [ ] Unknown callout types render safely with a default style.
-- [ ] Callout normalization does not break MDX component usage nearby.
-- [ ] Tests cover common types, custom titles, nested cases, foldable markers, unknown types, and MDX-adjacent content.
+- [x] `@fea-docs/syntax-engine` exposes a clear input/output contract that does not depend on `@fea-docs/cli` internals or publishing destinations.
+- [x] `@fea-docs/syntax-engine` can register `@fea-docs/obsidian` syntax handlers without coupling them to target filtering, rendering, or publishing modules.
+- [x] The engine contract is suitable for reuse by future tools such as a VS Code extension for preview, validation, or authoring assistance.
+- [x] `> [!note]`, `> [!info]`, `> [!tip]`, `> [!warning]`, `> [!danger]`, and `> [!question]` render with predictable styles.
+- [x] Custom callout titles are preserved.
+- [x] Markdown inside callout bodies renders correctly.
+- [x] Nested callouts do not corrupt the surrounding page structure.
+- [x] Foldable callouts render with accessible semantics or a documented fallback.
+- [x] Unknown callout types render safely with a default style.
+- [x] Callout normalization does not break MDX component usage nearby.
+- [x] Tests cover common types, custom titles, nested cases, foldable markers, unknown types, and MDX-adjacent content.
 
 ## Phase 6: Embeds and Transclusion
 

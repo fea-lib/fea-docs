@@ -20,7 +20,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fea-docs/obsidian": "workspace:*",
     "@fea-docs/schema": "workspace:*",
+    "@fea-docs/syntax-engine": "workspace:*",
     "fast-glob": "^3.3.2",
     "gray-matter": "^4.0.3",
     "ignore": "^5.3.2"
