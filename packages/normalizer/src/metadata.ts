@@ -102,8 +102,9 @@ function extractHeadings(content: string): FeaDocsHeading[] {
 
 /**
  * Convert heading text to a URL-safe anchor slug.
+ * Exported so wikilink fragment resolution can reuse the same algorithm.
  */
-function textToAnchor(text: string): string {
+export function textToAnchor(text: string): string {
   return text
     .toLowerCase()
     .replace(/[^\w\s-]/g, '')

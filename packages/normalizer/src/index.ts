@@ -3,9 +3,10 @@ import path from 'node:path';
 import fg from 'fast-glob';
 import matter from 'gray-matter';
 import ignoreLib from 'ignore';
-import { artifactFileNames, type FeaDocsDiagnosticsFile, type FeaDocsManifest } from '@fea-docs/schema';
+import { artifactFileNames, type FeaDocsDiagnosticsFile, type FeaDocsGraphEdge, type FeaDocsManifest } from '@fea-docs/schema';
 import { deriveTitle, extractMetadata } from './metadata.js';
 import { selectStaticFilesToCopy } from './assets.js';
+import { buildPageIndex, transformWikilinks, type PageRef } from './wikilinks.js';
 
 // The `ignore` package exports itself differently across module modes.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -247,10 +248,49 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
     }
   }
 
-  // Copy pages and static files to output.
+  // Build the page index for wikilink resolution.
+  const pageRefs: PageRef[] = pages.map((page) => ({
+    relativePath: page.relativePath,
+    route: page.route,
+    title: page.title,
+    aliases: page.metadata.aliases,
+    headings: page.metadata.headings,
+    blockIds: page.metadata.blockIds,
+  }));
+  const pageIndex = buildPageIndex(pageRefs);
+
+  // Collect graph edges from wikilink resolution across all pages.
+  const allGraphEdges: FeaDocsGraphEdge[] = [];
+
+  // Write pages to output — transform wikilinks in each page's content.
   for (const page of pages) {
-    copyFile(page.absolutePath, path.join(outputRoot, page.outputPath));
+    const { content: transformed, edges, diagnostics: wikilinkDiags } = transformWikilinks(
+      page.rawContent,
+      page.relativePath,
+      page.route,
+      pageIndex,
+      options.strict ?? false,
+    );
+
+    // Surface wikilink diagnostics.
+    for (const d of wikilinkDiags) {
+      addDiagnostic(d.code, d.severity, d.message, d.sourcePath, d.suggestion, d.location);
+    }
+
+    allGraphEdges.push(...edges);
+
+    // Write transformed content (may differ from source if wikilinks were resolved).
+    const outputFilePath = path.join(outputRoot, page.outputPath);
+    fs.mkdirSync(path.dirname(outputFilePath), { recursive: true });
+    fs.writeFileSync(outputFilePath, transformed, 'utf-8');
   }
+
+  // Fail strict builds if wikilink errors were introduced.
+  if (options.strict && diagnostics.diagnostics.some((d) => d.severity === 'error')) {
+    writeJson(path.join(outputRoot, artifactFileNames.diagnostics), diagnostics);
+    throw new Error('Normalization failed due to strict diagnostics.');
+  }
+
   for (const staticFile of staticFilesToCopy) {
     copyFile(path.join(sourceRoot, staticFile), path.join(outputRoot, staticFile));
   }
@@ -300,7 +340,7 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
       route: page.route,
       tags: page.metadata.tags.length > 0 ? page.metadata.tags : undefined,
     })),
-    edges: [],
+    edges: allGraphEdges,
   });
   writeJson(path.join(outputRoot, artifactFileNames.backlinks), {
     version: 1,

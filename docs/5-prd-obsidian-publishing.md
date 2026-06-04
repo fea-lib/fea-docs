@@ -565,18 +565,18 @@ Implement deterministic target resolution for Obsidian wikilinks and normalize s
 
 ### Acceptance Criteria
 
-- [ ] `[[Note]]` resolves to the correct public page route.
-- [ ] `[[Note|Alias]]` renders using alias link text.
-- [ ] `[[Note#Heading]]` resolves to the correct heading anchor.
-- [ ] `[[Note#Heading|Alias]]` resolves and renders using alias text.
-- [ ] `[[Note#^block-id]]` resolves to the correct explicit block anchor.
-- [ ] Links can resolve by source path, title, and global frontmatter aliases.
-- [ ] Pipe aliases are treated as per-link display text, not global alias definitions.
-- [ ] Ambiguous targets produce diagnostics instead of silent resolution.
-- [ ] Wikilink-like text inside fenced code, inline code, MDX imports/exports, JSX expressions, and component attributes is not corrupted.
-- [ ] Development mode warns on unresolved or ambiguous wikilinks on pages public for the selected target.
-- [ ] Strict mode fails unresolved or ambiguous wikilinks on pages public for the selected target.
-- [ ] Tests cover successful links, heading anchors, aliases, ambiguity, unresolved targets, and MDX safety cases.
+- [x] `[[Note]]` resolves to the correct public page route.
+- [x] `[[Note|Alias]]` renders using alias link text.
+- [x] `[[Note#Heading]]` resolves to the correct heading anchor.
+- [x] `[[Note#Heading|Alias]]` resolves and renders using alias text.
+- [x] `[[Note#^block-id]]` resolves to the correct explicit block anchor.
+- [x] Links can resolve by source path, title, and global frontmatter aliases.
+- [x] Pipe aliases are treated as per-link display text, not global alias definitions.
+- [x] Ambiguous targets produce diagnostics instead of silent resolution.
+- [x] Wikilink-like text inside fenced code, inline code, MDX imports/exports, JSX expressions, and component attributes is not corrupted.
+- [x] Development mode warns on unresolved or ambiguous wikilinks on pages public for the selected target.
+- [x] Strict mode fails unresolved or ambiguous wikilinks on pages public for the selected target.
+- [x] Tests cover successful links, heading anchors, aliases, ambiguity, unresolved targets, and MDX safety cases.
 
 ## Phase 4: Privacy-Safe Link and Asset Validation
 
