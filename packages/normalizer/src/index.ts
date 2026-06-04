@@ -435,6 +435,9 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
       addDiagnostic(ed.code, ed.severity, ed.message, ed.sourcePath, ed.suggestion, ed.location);
     }
 
+    // Collect embed-derived graph edges.
+    allGraphEdges.push(...embedResult.edges);
+
     // Inject block anchors (^block-id → <span id="block-id"></span>).
     const finalContent = injectBlockAnchors(embedResult.content);
 
@@ -527,10 +530,72 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
     })),
     edges: allGraphEdges,
   });
+  // ---------------------------------------------------------------------------
+  // Build backlinks from graph edges.
+  // Only edges from target-public source pages are included.
+  // ---------------------------------------------------------------------------
+  const publicRouteSet = new Set(pages.map((p) => p.route));
+  const publicRouteToTitle = new Map(pages.map((p) => [p.route, p.title]));
+
+  // Collect backlinks keyed by target route.
+  const backlinksMap = new Map<string, Array<{ sourceId: string; sourceTitle: string; sourceRoute: string }>>();
+
+  for (const edge of allGraphEdges) {
+    // Only consider wikilink and embed edges (not asset edges).
+    if (edge.type !== 'wikilink' && edge.type !== 'embed') continue;
+    // Source must be target-public.
+    if (!publicRouteSet.has(edge.source)) continue;
+    // Target must also be target-public.
+    if (!publicRouteSet.has(edge.target)) continue;
+
+    const sourceTitle = publicRouteToTitle.get(edge.source) ?? edge.source;
+    const entry = { sourceId: edge.source, sourceTitle, sourceRoute: edge.source };
+
+    const existing = backlinksMap.get(edge.target);
+    if (existing) {
+      // Deduplicate by sourceRoute.
+      if (!existing.some((e) => e.sourceRoute === edge.source)) {
+        existing.push(entry);
+      }
+    } else {
+      backlinksMap.set(edge.target, [entry]);
+    }
+  }
+
+  // Strict mode: if any edge from a non-public source points to a public page
+  // with backlinks enabled, fail (this would be a privacy leak in backlink data).
+  if (options.strict) {
+    for (const edge of allGraphEdges) {
+      if (edge.type !== 'wikilink' && edge.type !== 'embed') continue;
+      if (publicRouteSet.has(edge.source)) continue; // public source — fine
+      if (!publicRouteSet.has(edge.target)) continue; // target not public — irrelevant
+      const targetPage = pages.find((p) => p.route === edge.target);
+      if (targetPage?.metadata.backlinks) {
+        addDiagnostic(
+          'BACKLINK_PRIVATE_SOURCE',
+          'error',
+          `Private or cross-target page with route "${edge.source}" references backlink-enabled page "${edge.target}". Backlink data would expose non-public content.`,
+          targetPage.relativePath,
+          'Remove the link from the private page or disable backlinks on the target page.',
+        );
+      }
+    }
+    if (diagnostics.diagnostics.some((d) => d.severity === 'error')) {
+      writeJson(path.join(outputRoot, artifactFileNames.diagnostics), diagnostics);
+      throw new Error('Normalization failed due to strict diagnostics.');
+    }
+  }
+
+  // Convert map to FeaDocsBacklinks pages record.
+  const backlinksPages: Record<string, Array<{ sourceId: string; sourceTitle: string; sourceRoute: string }>> = {};
+  for (const [route, entries] of backlinksMap) {
+    backlinksPages[route] = entries;
+  }
+
   writeJson(path.join(outputRoot, artifactFileNames.backlinks), {
     version: 1,
     targetId: options.targetId,
-    pages: {},
+    pages: backlinksPages,
   });
   writeJson(path.join(outputRoot, artifactFileNames.search), {
     version: 1,

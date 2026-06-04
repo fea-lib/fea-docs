@@ -92,6 +92,8 @@ export interface EmbedExpandOptions {
 export interface EmbedExpandResult {
   content: string;
   diagnostics: EmbedDiagnostic[];
+  /** Graph edges produced by resolved note/heading/block embeds. */
+  edges: Array<{ source: string; target: string; type: 'embed' }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -309,6 +311,7 @@ export function expandEmbeds(
   options: EmbedExpandOptions,
 ): EmbedExpandResult {
   const diagnostics: EmbedDiagnostic[] = [];
+  const edges: Array<{ source: string; target: string; type: 'embed' }> = [];
   const resolvingStack = options.resolvingStack ?? [];
   const expandCache = options.expandCache ?? new Map<string, string>();
 
@@ -354,6 +357,7 @@ export function expandEmbeds(
       line,
       lineIndex + 1,
       diagnostics,
+      edges,
       resolvingStack,
       expandCache,
       options,
@@ -361,7 +365,7 @@ export function expandEmbeds(
     outputLines.push(processedLine);
   }
 
-  return { content: outputLines.join('\n'), diagnostics };
+  return { content: outputLines.join('\n'), diagnostics, edges };
 }
 
 /**
@@ -371,6 +375,7 @@ function expandEmbedsInLine(
   line: string,
   lineNumber: number,
   diagnostics: EmbedDiagnostic[],
+  edges: Array<{ source: string; target: string; type: 'embed' }>,
   resolvingStack: string[],
   expandCache: Map<string, string>,
   options: EmbedExpandOptions,
@@ -380,7 +385,7 @@ function expandEmbedsInLine(
   return segments
     .map((segment, idx) => {
       if (idx % 2 !== 0) return segment; // inline code — leave untouched
-      return replaceEmbedsInSegment(segment, lineNumber, diagnostics, resolvingStack, expandCache, options);
+      return replaceEmbedsInSegment(segment, lineNumber, diagnostics, edges, resolvingStack, expandCache, options);
     })
     .join('');
 }
@@ -389,13 +394,14 @@ function replaceEmbedsInSegment(
   text: string,
   lineNumber: number,
   diagnostics: EmbedDiagnostic[],
+  edges: Array<{ source: string; target: string; type: 'embed' }>,
   resolvingStack: string[],
   expandCache: Map<string, string>,
   options: EmbedExpandOptions,
 ): string {
   return text.replace(EMBED_RE, (raw, inner) => {
     const embed = parseEmbed(raw, inner);
-    return resolveEmbed(embed, lineNumber, diagnostics, resolvingStack, expandCache, options);
+    return resolveEmbed(embed, lineNumber, diagnostics, edges, resolvingStack, expandCache, options);
   });
 }
 
@@ -407,6 +413,7 @@ function resolveEmbed(
   embed: ParsedEmbed,
   lineNumber: number,
   diagnostics: EmbedDiagnostic[],
+  edges: Array<{ source: string; target: string; type: 'embed' }>,
   resolvingStack: string[],
   expandCache: Map<string, string>,
   options: EmbedExpandOptions,
@@ -424,7 +431,7 @@ function resolveEmbed(
   // -------------------------------------------------------------------------
   // 2. Note / heading / block embed.
   // -------------------------------------------------------------------------
-  return resolveNoteEmbed(embed, lineNumber, diagnostics, resolvingStack, expandCache, options);
+  return resolveNoteEmbed(embed, lineNumber, diagnostics, edges, resolvingStack, expandCache, options);
 }
 
 // ---------------------------------------------------------------------------
@@ -496,6 +503,7 @@ function resolveNoteEmbed(
   embed: ParsedEmbed,
   lineNumber: number,
   diagnostics: EmbedDiagnostic[],
+  edges: Array<{ source: string; target: string; type: 'embed' }>,
   resolvingStack: string[],
   expandCache: Map<string, string>,
   options: EmbedExpandOptions,
@@ -605,6 +613,13 @@ function resolveNoteEmbed(
   // -------------------------------------------------------------------------
   // Cycle detection.
   // -------------------------------------------------------------------------
+  // Emit a graph edge for this resolved embed (source → target).
+  // Only the top-level caller emits edges (not recursive expansions), so we
+  // check that the resolvingStack is at the top level (i.e. the direct caller
+  // of expandEmbeds). However, since embed edges are about direct references,
+  // we always record this edge regardless of nesting.
+  edges.push({ source: options.sourceRoute, target: resolvedPage.route, type: 'embed' });
+
   if (resolvingStack.includes(resolvedPage.relativePath)) {
     const cycle = [...resolvingStack, resolvedPage.relativePath].join(' → ');
     diagnostics.push({
@@ -648,8 +663,9 @@ function resolveNoteEmbed(
       resolvingStack: [...resolvingStack, options.sourcePath],
       expandCache,
     });
-    // Propagate nested diagnostics.
+    // Propagate nested diagnostics and edges.
     diagnostics.push(...nestedResult.diagnostics);
+    edges.push(...nestedResult.edges);
     embeddedContent = nestedResult.content;
     expandCache.set(resolvedPage.relativePath, embeddedContent);
   }

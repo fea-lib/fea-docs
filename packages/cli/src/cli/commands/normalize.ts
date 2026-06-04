@@ -2,6 +2,7 @@ import path from 'node:path';
 import { Command } from 'commander';
 import pc from 'picocolors';
 import { normalizeVault } from '@fea-docs/normalizer';
+import { renderBacklinks } from '../../backlinks/renderer.js';
 import { resolveConfig } from '../../config/resolver.js';
 import type { ResolvedConfig } from '../../types.js';
 
@@ -35,7 +36,13 @@ export function normalizeCommand(): Command {
           ignore: config.ignore,
         });
 
+        // Render backlinks into eligible pages (those with backlinks: true).
+        const backlinkResult = renderBacklinks({ outputRoot });
+
         console.log(pc.green(`Normalized ${result.manifest.pages.length} page(s) for target "${targetId}".`));
+        if (backlinkResult.pagesRendered > 0) {
+          console.log(pc.cyan(`Backlinks rendered on ${backlinkResult.pagesRendered} page(s).`));
+        }
         console.log(pc.cyan(`Output: ${outputRoot}`));
       } catch (err) {
         console.error(pc.red('Error:'), err instanceof Error ? err.message : String(err));

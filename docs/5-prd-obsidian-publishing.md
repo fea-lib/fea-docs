@@ -649,15 +649,15 @@ Generate target-public backlinks from the normalized content graph and render th
 
 ### Acceptance Criteria
 
-- [ ] Backlinks are generated from target-public Markdown links, wikilinks, and supported embeds.
-- [ ] Backlink entries include source title and route.
-- [ ] Backlinks exclude private source pages, cross-target source pages, and private-only references.
-- [ ] Backlinks render when enabled globally.
-- [ ] Backlinks render per page when frontmatter `backlinks: true` is present.
-- [ ] Backlinks do not render by default on every page.
-- [ ] Backlink rendering works in `@fea-docs/cli` static output from normalized docs.
-- [ ] Strict mode fails if backlink data would expose private or cross-target content.
-- [ ] Tests cover public backlinks, private source exclusion, alias labels, embed-derived backlinks, and disabled backlinks.
+- [x] Backlinks are generated from target-public Markdown links, wikilinks, and supported embeds.
+- [x] Backlink entries include source title and route.
+- [x] Backlinks exclude private source pages, cross-target source pages, and private-only references.
+- [x] Backlinks render when enabled globally.
+- [x] Backlinks render per page when frontmatter `backlinks: true` is present.
+- [x] Backlinks do not render by default on every page.
+- [x] Backlink rendering works in `@fea-docs/cli` static output from normalized docs.
+- [x] Strict mode fails if backlink data would expose private or cross-target content.
+- [x] Tests cover public backlinks, private source exclusion, alias labels, embed-derived backlinks, and disabled backlinks.
 
 ## Phase 8: Static Graph Data and Built-In Graph UI
 
