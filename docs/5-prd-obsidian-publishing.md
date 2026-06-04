@@ -535,25 +535,25 @@ Implement `@fea-docs/normalizer` content discovery and metadata indexing for Mar
 
 ### Acceptance Criteria
 
-- [ ] `.md` and `.mdx` files are discovered recursively from the configured source vault or docs root.
-- [ ] Non-Markdown files under the configured root are discovered as candidate static files.
-- [ ] `.gitignore`, default ignores, and configured ignores are respected.
-- [ ] Metadata is extracted for title, aliases, slug, draft, publish targets, backlinks, pagefind, headings, block IDs, and source path.
-- [ ] Title fallback order remains frontmatter title, first H1, then filename.
-- [ ] Nothing is published by default.
-- [ ] Explicit frontmatter `publish: engineering` allowlisting makes a page public for the selected `engineering` target.
-- [ ] YAML list frontmatter such as `publish: [engineering, recipes]` makes a page public for each listed configured target.
-- [ ] Frontmatter `publish: false` is accepted as an explicit non-public marker.
-- [ ] Unknown publish target IDs warn in development and fail strict validation.
-- [ ] Production builds exclude `draft: true` pages.
-- [ ] Ignore patterns win first, then `draft: true` in production, then explicit membership in the selected configured target; absent target membership means non-public for that build.
-- [ ] Non-target pages are excluded from normalized docs, static output, navigation, search input, backlinks input, and graph input.
-- [ ] The normalized docs tree preserves `.md` when no MDX syntax is required and emits `.mdx` when the source or normalized output requires MDX.
-- [ ] Non-Markdown files are copied unchanged into the normalized docs tree when referenced by target-public content or allowed by target-specific asset rules.
-- [ ] Copied non-Markdown files preserve their relative paths from the configured root unless target config explicitly remaps them.
-- [ ] `fea-docs.manifest.json` maps source files to normalized output files and records target ID, routes, included assets, copied static files, generated data files, and diagnostics summary.
-- [ ] Development mode reports filtering decisions in a debuggable way.
-- [ ] Strict mode fails invalid frontmatter, duplicate routes/slugs, unknown targets, and missing title fallback.
+- [x] `.md` and `.mdx` files are discovered recursively from the configured source vault or docs root.
+- [x] Non-Markdown files under the configured root are discovered as candidate static files.
+- [x] `.gitignore`, default ignores, and configured ignores are respected.
+- [x] Metadata is extracted for title, aliases, slug, draft, publish targets, backlinks, pagefind, headings, block IDs, and source path.
+- [x] Title fallback order remains frontmatter title, first H1, then filename.
+- [x] Nothing is published by default.
+- [x] Explicit frontmatter `publish: engineering` allowlisting makes a page public for the selected `engineering` target.
+- [x] YAML list frontmatter such as `publish: [engineering, recipes]` makes a page public for each listed configured target.
+- [x] Frontmatter `publish: false` is accepted as an explicit non-public marker.
+- [x] Unknown publish target IDs warn in development and fail strict validation.
+- [x] Production builds exclude `draft: true` pages.
+- [x] Ignore patterns win first, then `draft: true` in production, then explicit membership in the selected configured target; absent target membership means non-public for that build.
+- [x] Non-target pages are excluded from normalized docs, static output, navigation, search input, backlinks input, and graph input.
+- [x] The normalized docs tree preserves `.md` when no MDX syntax is required and emits `.mdx` when the source or normalized output requires MDX.
+- [x] Non-Markdown files are copied unchanged into the normalized docs tree when referenced by target-public content or allowed by target-specific asset rules.
+- [x] Copied non-Markdown files preserve their relative paths from the configured root unless target config explicitly remaps them.
+- [x] `fea-docs.manifest.json` maps source files to normalized output files and records target ID, routes, included assets, copied static files, generated data files, and diagnostics summary.
+- [x] Development mode reports filtering decisions in a debuggable way.
+- [x] Strict mode fails invalid frontmatter, duplicate routes/slugs, unknown targets, and missing title fallback.
 
 ## Phase 3: Route Resolver and Wikilinks
 

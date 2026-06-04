@@ -4,18 +4,26 @@ import fg from 'fast-glob';
 import matter from 'gray-matter';
 import ignoreLib from 'ignore';
 import { artifactFileNames, type FeaDocsDiagnosticsFile, type FeaDocsManifest } from '@fea-docs/schema';
+import { deriveTitle, extractMetadata } from './metadata.js';
+import { selectStaticFilesToCopy } from './assets.js';
 
 // The `ignore` package exports itself differently across module modes.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const createIgnore: () => ReturnType<typeof ignoreLib['default']> = (ignoreLib as any).default ?? ignoreLib;
+
+export type NormalizeMode = 'development' | 'production';
 
 export interface NormalizeOptions {
   sourceRoot: string;
   outputRoot: string;
   targetId: string;
   strict?: boolean;
+  /** 'production' (default) or 'development'. Development mode emits info diagnostics instead of skipping silently. */
+  mode?: NormalizeMode;
   configuredTargets?: string[];
   ignore?: string[];
+  /** Explicit public asset directories (relative to sourceRoot) always copied regardless of references. */
+  publicAssetDirs?: string[];
 }
 
 export interface NormalizeResult {
@@ -46,12 +54,21 @@ interface SourcePage {
   title: string;
   format: 'md' | 'mdx';
   frontmatter: Record<string, unknown>;
+  rawContent: string;
+  metadata: ReturnType<typeof extractMetadata>;
+}
+
+/** Diagnostics emitted for filtering decisions — useful in development mode. */
+interface FilterDecision {
+  file: string;
+  reason: 'ignored' | 'draft' | 'private' | 'not-for-target';
 }
 
 export async function normalizeVault(options: NormalizeOptions): Promise<NormalizeResult> {
   const sourceRoot = path.resolve(options.sourceRoot);
   const outputRoot = path.resolve(options.outputRoot);
   const configuredTargets = new Set(options.configuredTargets ?? [options.targetId]);
+  const mode: NormalizeMode = options.mode ?? 'production';
   const generatedAt = new Date().toISOString();
 
   if (!configuredTargets.has(options.targetId)) {
@@ -64,12 +81,23 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
     diagnostics: [],
   };
 
+  const addDiagnostic = (
+    code: string,
+    severity: 'info' | 'warning' | 'error',
+    message: string,
+    sourcePath?: string,
+    suggestion?: string,
+    location?: { line?: number; column?: number },
+  ) => {
+    diagnostics.diagnostics.push({ code, severity, message, ...(sourcePath ? { sourcePath } : {}), ...(suggestion ? { suggestion } : {}), ...(location ? { location } : {}) });
+  };
+
   fs.rmSync(outputRoot, { recursive: true, force: true });
   fs.mkdirSync(outputRoot, { recursive: true });
 
   const gitignoreFilter = buildGitignoreFilter(sourceRoot);
   const ignoreGlobs = [...DEFAULT_IGNORE_GLOBS, ...(options.ignore ?? [])];
-  const files = await fg(['**/*'], {
+  const allFiles = await fg(['**/*'], {
     cwd: sourceRoot,
     dot: true,
     onlyFiles: true,
@@ -77,46 +105,153 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
     ignore: ignoreGlobs,
   });
 
-  const filteredFiles = files
+  const filteredFiles = allFiles
     .filter((file) => !gitignoreFilter?.ignores(file))
     .sort();
 
+  const filterDecisions: FilterDecision[] = [];
   const pages: SourcePage[] = [];
-  const staticFiles: string[] = [];
+  const allStaticFiles: string[] = [];
 
   for (const relativePath of filteredFiles) {
     const absolutePath = path.join(sourceRoot, relativePath);
+
     if (/\.mdx?$/i.test(relativePath)) {
-      const page = readPage(sourceRoot, absolutePath, relativePath);
-      const unknownTargets = publishTargets(page.frontmatter.publish as PublishValue)
-        .filter((target) => !configuredTargets.has(target));
-      for (const target of unknownTargets) {
-        diagnostics.diagnostics.push({
-          code: 'UNKNOWN_PUBLISH_TARGET',
-          severity: options.strict ? 'error' : 'warning',
-          sourcePath: relativePath,
-          message: `Unknown publish target "${target}".`,
-          suggestion: 'Add the target to fea-docs config or remove it from frontmatter.',
-        });
+      const raw = fs.readFileSync(absolutePath, 'utf-8');
+      const parsed = matter(raw);
+      const fm = parsed.data as Record<string, unknown>;
+      const format: 'md' | 'mdx' = relativePath.endsWith('.mdx') ? 'mdx' : 'md';
+      const { title, titleFromFilename } = deriveTitle(fm, parsed.content, relativePath);
+      const meta = extractMetadata(fm, parsed.content, relativePath);
+
+      // Validate frontmatter types.
+      if (fm.title !== undefined && typeof fm.title !== 'string') {
+        addDiagnostic(
+          'FRONTMATTER_SCHEMA_ERROR',
+          options.strict ? 'error' : 'warning',
+          `Frontmatter "title" must be a string but got ${typeof fm.title}.`,
+          relativePath,
+          'Change the title value to a string.',
+        );
+      }
+      if (fm.aliases !== undefined && !Array.isArray(fm.aliases) && typeof fm.aliases !== 'string') {
+        addDiagnostic(
+          'FRONTMATTER_SCHEMA_ERROR',
+          options.strict ? 'error' : 'warning',
+          `Frontmatter "aliases" must be a string or array.`,
+          relativePath,
+          'Use a YAML string or list for aliases.',
+        );
       }
 
-      if (isPublicForTarget(page.frontmatter, options.targetId)) {
-        pages.push(page);
+      // Warn/fail on unknown targets.
+      const unknownTargets = publishTargets(fm.publish as PublishValue)
+        .filter((t) => !configuredTargets.has(t));
+      for (const target of unknownTargets) {
+        addDiagnostic(
+          'UNKNOWN_PUBLISH_TARGET',
+          options.strict ? 'error' : 'warning',
+          `Unknown publish target "${target}".`,
+          relativePath,
+          'Add the target to fea-docs config or remove it from frontmatter.',
+        );
       }
-    } else if (!relativePath.startsWith('private/') && !relativePath.startsWith('drafts/')) {
-      staticFiles.push(relativePath);
+
+      // Warn in dev mode when title falls back to filename.
+      if (titleFromFilename) {
+        addDiagnostic(
+          'MISSING_TITLE',
+          options.strict ? 'error' : 'warning',
+          `No frontmatter title or H1 found; using filename "${title}" as title.`,
+          relativePath,
+          'Add a frontmatter title or an H1 heading to the page.',
+        );
+      }
+
+      // Filter: draft pages.
+      if (fm.draft === true) {
+        filterDecisions.push({ file: relativePath, reason: 'draft' });
+        if (mode === 'development') {
+          addDiagnostic('FILTERED_DRAFT', 'info', `Page excluded (draft: true).`, relativePath);
+        }
+        continue;
+      }
+
+      // Filter: not public for this target.
+      if (!isPublicForTarget(fm, options.targetId)) {
+        const reason = fm.publish === false || fm.publish === undefined ? 'private' : 'not-for-target';
+        filterDecisions.push({ file: relativePath, reason });
+        if (mode === 'development') {
+          addDiagnostic(
+            'FILTERED_NON_TARGET',
+            'info',
+            `Page excluded from target "${options.targetId}" (publish=${JSON.stringify(fm.publish)}).`,
+            relativePath,
+          );
+        }
+        continue;
+      }
+
+      pages.push({
+        relativePath,
+        absolutePath,
+        outputPath: relativePath,
+        route: routeFor(relativePath),
+        title,
+        format,
+        frontmatter: fm,
+        rawContent: raw,
+        metadata: { ...meta, titleFromFilename },
+      });
+    } else {
+      allStaticFiles.push(relativePath);
     }
   }
 
+  // Check for duplicate routes/slugs (strict: error, dev: warning).
+  const routeMap = new Map<string, string>();
+  for (const page of pages) {
+    const existing = routeMap.get(page.route);
+    if (existing) {
+      addDiagnostic(
+        'DUPLICATE_SLUG',
+        options.strict ? 'error' : 'warning',
+        `Duplicate route "${page.route}" from "${page.relativePath}" and "${existing}".`,
+        page.relativePath,
+        'Rename one of the files or set a unique frontmatter slug.',
+      );
+    } else {
+      routeMap.set(page.route, page.relativePath);
+    }
+  }
+
+  // Fail early if strict and there are errors.
   if (options.strict && diagnostics.diagnostics.some((d) => d.severity === 'error')) {
     writeJson(path.join(outputRoot, artifactFileNames.diagnostics), diagnostics);
     throw new Error('Normalization failed due to strict diagnostics.');
   }
 
+  // Determine which static files to copy (referenced from public pages + explicit dirs).
+  const publicAssetDirs = options.publicAssetDirs ?? [];
+  const staticFilesToCopy = selectStaticFilesToCopy(
+    allStaticFiles,
+    pages.map((p) => ({ relativePath: p.relativePath, rawContent: p.rawContent })),
+    publicAssetDirs,
+  );
+
+  // Emit filter decisions as debug log if in development mode.
+  if (mode === 'development' && filterDecisions.length > 0) {
+    for (const decision of filterDecisions) {
+      // Already emitted as info diagnostics above; just ensure they're recorded.
+      void decision;
+    }
+  }
+
+  // Copy pages and static files to output.
   for (const page of pages) {
     copyFile(page.absolutePath, path.join(outputRoot, page.outputPath));
   }
-  for (const staticFile of staticFiles) {
+  for (const staticFile of staticFilesToCopy) {
     copyFile(path.join(sourceRoot, staticFile), path.join(outputRoot, staticFile));
   }
 
@@ -130,9 +265,17 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
       route: page.route,
       title: page.title,
       format: page.format,
+      aliases: page.metadata.aliases.length > 0 ? page.metadata.aliases : undefined,
+      slug: page.metadata.slug,
+      headings: page.metadata.headings.length > 0 ? page.metadata.headings : undefined,
+      blockIds: page.metadata.blockIds.length > 0 ? page.metadata.blockIds : undefined,
+      tags: page.metadata.tags.length > 0 ? page.metadata.tags : undefined,
+      backlinks: page.metadata.backlinks,
+      pagefind: page.metadata.pagefind,
+      titleFromFilename: page.metadata.titleFromFilename || undefined,
     })),
-    assets: staticFiles.filter((file) => file.startsWith('assets/')),
-    staticFiles,
+    assets: staticFilesToCopy.filter((f) => /\.(png|jpe?g|gif|svg|webp|avif)$/i.test(f)),
+    staticFiles: staticFilesToCopy,
     generatedDataFiles: [
       artifactFileNames.diagnostics,
       artifactFileNames.graph,
@@ -151,7 +294,12 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
   writeJson(path.join(outputRoot, artifactFileNames.graph), {
     version: 1,
     targetId: options.targetId,
-    nodes: pages.map((page) => ({ id: page.route, title: page.title, route: page.route })),
+    nodes: pages.map((page) => ({
+      id: page.route,
+      title: page.title,
+      route: page.route,
+      tags: page.metadata.tags.length > 0 ? page.metadata.tags : undefined,
+    })),
     edges: [],
   });
   writeJson(path.join(outputRoot, artifactFileNames.backlinks), {
@@ -165,41 +313,22 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
     pages: pages.map((page) => ({
       pageId: page.route,
       route: page.route,
-      included: page.frontmatter.pagefind !== false,
-      ...(page.frontmatter.pagefind === false ? { reason: 'pagefind:false' } : {}),
+      included: page.metadata.pagefind,
+      ...(page.metadata.pagefind ? {} : { reason: 'pagefind:false' }),
     })),
   });
 
   return { manifest, diagnostics };
 }
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function buildGitignoreFilter(root: string): ReturnType<typeof ignoreLib.default> | null {
   const gitignorePath = path.join(root, '.gitignore');
   if (!fs.existsSync(gitignorePath)) return null;
   return createIgnore().add(fs.readFileSync(gitignorePath, 'utf-8'));
-}
-
-function readPage(root: string, absolutePath: string, relativePath: string): SourcePage {
-  const raw = fs.readFileSync(absolutePath, 'utf-8');
-  const parsed = matter(raw);
-  const format = relativePath.endsWith('.mdx') ? 'mdx' : 'md';
-  const title = deriveTitle(parsed.data, parsed.content, relativePath);
-  return {
-    relativePath,
-    absolutePath,
-    outputPath: relativePath,
-    route: routeFor(relativePath),
-    title,
-    format,
-    frontmatter: parsed.data,
-  };
-}
-
-function deriveTitle(frontmatter: Record<string, unknown>, content: string, relativePath: string): string {
-  if (typeof frontmatter.title === 'string' && frontmatter.title.trim()) return frontmatter.title.trim();
-  const h1 = content.match(/^#\s+(.+)$/m)?.[1]?.trim();
-  if (h1) return h1;
-  return path.basename(relativePath).replace(/\.(md|mdx)$/i, '').replace(/[-_]/g, ' ');
 }
 
 function routeFor(relativePath: string): string {

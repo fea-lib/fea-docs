@@ -30,12 +30,34 @@ export interface FeaDocsDiagnosticsFile {
   diagnostics: FeaDocsDiagnostic[];
 }
 
+export interface FeaDocsHeading {
+  level: number;
+  text: string;
+  anchor: string;
+}
+
 export interface FeaDocsManifestEntry {
   sourcePath: string;
   outputPath: string;
   route: string;
   title: string;
   format: 'md' | 'mdx';
+  /** Global aliases declared in frontmatter for this page. */
+  aliases?: string[];
+  /** Explicit slug from frontmatter, overriding the filename-derived route segment. */
+  slug?: string;
+  /** Headings extracted from the page content. */
+  headings?: FeaDocsHeading[];
+  /** Explicit block IDs found in the page content (^block-id markers). */
+  blockIds?: string[];
+  /** Tags from frontmatter or inline content. */
+  tags?: string[];
+  /** Whether backlinks rendering is enabled for this page. */
+  backlinks?: boolean;
+  /** Whether this page is included in Pagefind search. */
+  pagefind?: boolean;
+  /** Title was derived from filename (no frontmatter title or H1 present). */
+  titleFromFilename?: boolean;
 }
 
 export interface FeaDocsManifest {
