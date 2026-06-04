@@ -45,7 +45,7 @@ function makeGraph(root: string, pages: Array<{ rel: string; label: string; entr
 
 async function invokePrivate(
   adapter: RuntimeAdapter,
-  method: 'writeContentConfig' | 'writeContentLinks' | 'writeAstroConfig' | 'writeRemarkPlugin',
+  method: 'writeContentConfig' | 'writeContentLinks' | 'writeAstroConfig' | 'writeRemarkPlugin' | 'writeGraphPage',
 ): Promise<void> {
   await (adapter as unknown as Record<string, () => Promise<void>>)[method]();
 }
@@ -241,5 +241,100 @@ describe('RuntimeAdapter content loader config', () => {
 
     const astroConfig = fs.readFileSync(path.join(adapter.projectDir, 'astro.config.mjs'), 'utf-8');
     expect(astroConfig).toContain("title: \"Math Tools\"");
+  });
+});
+
+describe('RuntimeAdapter graph page', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTmpDir();
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('writes graph.astro page when no fea-docs.graph.json is present', async () => {
+    const graph = makeGraph(tmpDir, [
+      { rel: 'index.md', label: 'Home', entryId: 'index', isSectionIndex: true },
+    ]);
+    const adapter = new RuntimeAdapter({ config: makeConfig(tmpDir), graph });
+    fs.mkdirSync(path.join(adapter.projectDir, 'src', 'pages'), { recursive: true });
+    await invokePrivate(adapter, 'writeGraphPage');
+
+    const graphPagePath = path.join(adapter.projectDir, 'src', 'pages', 'graph.astro');
+    expect(fs.existsSync(graphPagePath)).toBe(true);
+    const content = fs.readFileSync(graphPagePath, 'utf-8');
+    expect(content).toContain('StarlightPage');
+    expect(content).toContain('fea-graph-canvas');
+    expect(content).toContain('fea-graph-fallback');
+  });
+
+  it('embeds graph JSON data inline when fea-docs.graph.json exists in config root', async () => {
+    const graphData = {
+      version: 1,
+      targetId: 'engineering',
+      nodes: [{ id: '/home', title: 'Home', route: '/home' }],
+      edges: [],
+    };
+    fs.writeFileSync(
+      path.join(tmpDir, 'fea-docs.graph.json'),
+      JSON.stringify(graphData),
+    );
+
+    const graph = makeGraph(tmpDir, [
+      { rel: 'index.md', label: 'Home', entryId: 'index', isSectionIndex: true },
+    ]);
+    const adapter = new RuntimeAdapter({ config: makeConfig(tmpDir), graph });
+    fs.mkdirSync(path.join(adapter.projectDir, 'src', 'pages'), { recursive: true });
+    await invokePrivate(adapter, 'writeGraphPage');
+
+    const content = fs.readFileSync(
+      path.join(adapter.projectDir, 'src', 'pages', 'graph.astro'),
+      'utf-8',
+    );
+    expect(content).toContain('"targetId"');
+    expect(content).toContain('"engineering"');
+    expect(content).toContain('/home');
+  });
+
+  it('includes a non-visual fallback table with page links when graph data exists', async () => {
+    const graphData = {
+      version: 1,
+      targetId: 'engineering',
+      nodes: [{ id: '/guide', title: 'Guide', route: '/guide', tags: ['intro'] }],
+      edges: [],
+    };
+    fs.writeFileSync(path.join(tmpDir, 'fea-docs.graph.json'), JSON.stringify(graphData));
+
+    const graph = makeGraph(tmpDir, []);
+    const adapter = new RuntimeAdapter({ config: makeConfig(tmpDir), graph });
+    fs.mkdirSync(path.join(adapter.projectDir, 'src', 'pages'), { recursive: true });
+    await invokePrivate(adapter, 'writeGraphPage');
+
+    const content = fs.readFileSync(
+      path.join(adapter.projectDir, 'src', 'pages', 'graph.astro'),
+      'utf-8',
+    );
+    expect(content).toContain('Guide');
+    expect(content).toContain('/guide/');
+    expect(content).toContain('fea-graph-fallback');
+    // Table headers.
+    expect(content).toContain('Title');
+    expect(content).toContain('Route');
+  });
+
+  it('renders the Knowledge Graph sidebar link in astro.config.mjs', async () => {
+    const graph = makeGraph(tmpDir, [
+      { rel: 'index.md', label: 'Home', entryId: 'index', isSectionIndex: true },
+    ]);
+    const adapter = new RuntimeAdapter({ config: makeConfig(tmpDir), graph });
+    fs.mkdirSync(adapter.projectDir, { recursive: true });
+    await invokePrivate(adapter, 'writeAstroConfig');
+
+    const astroConfig = fs.readFileSync(path.join(adapter.projectDir, 'astro.config.mjs'), 'utf-8');
+    expect(astroConfig).toContain('Knowledge Graph');
+    expect(astroConfig).toContain('/graph/');
   });
 });

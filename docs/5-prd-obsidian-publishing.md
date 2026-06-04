@@ -669,15 +669,15 @@ Emit `fea-docs.graph.json` from the target-public normalized content graph and p
 
 ### Acceptance Criteria
 
-- [ ] `fea-docs.graph.json` includes target-public nodes with page ID, title, route, and optional tags.
-- [ ] `fea-docs.graph.json` includes target-public edges with source, target, and edge type where known.
-- [ ] Private pages, cross-target pages, private assets, private static files, unresolved targets, and private-only references are excluded.
-- [ ] Graph output is deterministic across builds for the same source and config.
-- [ ] Built-in graph UI is available without a separate integration package.
-- [ ] Graph UI can be disabled or omitted from pages where it is not needed.
-- [ ] Graph UI has a non-visual fallback such as a link list or table.
-- [ ] Static build requires no runtime server for graph behavior.
-- [ ] Tests inspect generated `fea-docs.graph.json` and verify private-content and cross-target exclusion.
+- [x] `fea-docs.graph.json` includes target-public nodes with page ID, title, route, and optional tags.
+- [x] `fea-docs.graph.json` includes target-public edges with source, target, and edge type where known.
+- [x] Private pages, cross-target pages, private assets, private static files, unresolved targets, and private-only references are excluded.
+- [x] Graph output is deterministic across builds for the same source and config.
+- [x] Built-in graph UI is available without a separate integration package.
+- [x] Graph UI can be disabled or omitted from pages where it is not needed.
+- [x] Graph UI has a non-visual fallback such as a link list or table.
+- [x] Static build requires no runtime server for graph behavior.
+- [x] Tests inspect generated `fea-docs.graph.json` and verify private-content and cross-target exclusion.
 
 ## Phase 9: Search Integration and Search Privacy
 

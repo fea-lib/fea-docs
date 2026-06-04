@@ -53,6 +53,7 @@ export class RuntimeAdapter {
     await this.writeAstroConfig();
     await this.writeContentLinks();
     await this.writeContentConfig();
+    await this.writeGraphPage();
     await this.installDeps();
   }
 
@@ -161,6 +162,7 @@ export default defineConfig({
       title: ${JSON.stringify(title)},
       sidebar: [
         { autogenerate: { directory: 'docs' } },
+        { label: 'Knowledge Graph', link: ${JSON.stringify(joinBasePath(config.base, '/graph/'))} },
       ],
     }),
     ${frameworkIntegrations}
@@ -407,6 +409,278 @@ export const collections = {
 };
 `;
     fs.writeFileSync(path.join(this.projectDir, 'src', 'content.config.ts'), config);
+  }
+
+  /**
+   * Write a built-in graph page at src/pages/graph.astro.
+   *
+   * If fea-docs.graph.json exists in the configured docs root, the graph data
+   * is embedded inline so the page is fully static (no server fetch required).
+   * If the file is absent the page renders an empty state message.
+   *
+   * The page is a standalone Astro page using the Starlight StarlightPage
+   * component so it inherits the full site shell. It adds no weight to other
+   * pages because the force-simulation script is scoped to this page only.
+   */
+  private async writeGraphPage(): Promise<void> {
+    const graphJsonPath = path.join(this.options.config.root, 'fea-docs.graph.json');
+    let graphJson: string;
+    let hasData = false;
+
+    if (fs.existsSync(graphJsonPath)) {
+      try {
+        const raw = fs.readFileSync(graphJsonPath, 'utf-8');
+        // Validate it is parseable JSON before embedding.
+        JSON.parse(raw);
+        graphJson = raw;
+        hasData = true;
+      } catch {
+        graphJson = '{"version":1,"targetId":"","nodes":[],"edges":[]}';
+      }
+    } else {
+      graphJson = '{"version":1,"targetId":"","nodes":[],"edges":[]}';
+    }
+
+    const pagesDir = path.join(this.projectDir, 'src', 'pages');
+    fs.mkdirSync(pagesDir, { recursive: true });
+
+    // Build the non-visual fallback table rows from graph data for SSG.
+    let fallbackRows = '';
+    let fallbackEdgeRows = '';
+    if (hasData) {
+      try {
+        const parsed = JSON.parse(graphJson) as {
+          nodes: Array<{ id: string; title: string; route: string; tags?: string[] }>;
+          edges: Array<{ source: string; target: string; type?: string }>;
+        };
+        fallbackRows = parsed.nodes
+          .map((n) => {
+            const href = this.escapeHtml(joinBasePath(this.options.config.base, n.route + '/'));
+            const title = this.escapeHtml(n.title);
+            const route = this.escapeHtml(n.route);
+            const tags = this.escapeHtml((n.tags ?? []).join(', '));
+            return '<tr><td><a href=' + JSON.stringify(href) + '>' + title + '</a></td><td><code>' + route + '</code></td><td>' + tags + '</td></tr>';
+          })
+          .join('\n          ');
+        fallbackEdgeRows = parsed.edges
+          .map((e) => {
+            const src = this.escapeHtml(e.source);
+            const tgt = this.escapeHtml(e.target);
+            const typ = this.escapeHtml(e.type ?? '');
+            return '<tr><td><code>' + src + '</code></td><td><code>' + tgt + '</code></td><td>' + typ + '</td></tr>';
+          })
+          .join('\n          ');
+      } catch {
+        // Silently fall back to empty rows on parse error.
+      }
+    }
+
+    const noPagesFallback = '<tr>' + '<td colspan="3">No pages.</td>' + '</tr>';
+    const noEdgesFallback = '<tr>' + '<td colspan="3">No connections.</td>' + '</tr>';
+    const emptyStateMessage = hasData
+      ? ''
+      : '<p class="graph-empty">No graph data found. Run <code>fea-docs normalize --target &lt;target&gt;</code> first.</p>';
+
+    // Build the page using string parts to avoid esbuild misinterpreting
+    // component-tag-like text inside template literals as JSX.
+    const frontmatter = [
+      '---',
+      "import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';",
+      'const GRAPH_DATA = ' + graphJson + ';',
+      '---',
+    ].join('\n');
+
+    const style = [
+      '  <style>',
+      '    #fea-graph-wrap { position: relative; width: 100%; }',
+      '    #fea-graph-canvas {',
+      '      display: block; width: 100%; height: 520px;',
+      '      border: 1px solid var(--sl-color-gray-5, #e2e8f0);',
+      '      border-radius: 0.5rem; background: var(--sl-color-bg, #fff); cursor: grab;',
+      '    }',
+      '    #fea-graph-canvas:active { cursor: grabbing; }',
+      '    .graph-empty { color: var(--sl-color-gray-3, #94a3b8); font-style: italic; padding: 1rem 0; }',
+      '    .fea-graph-fallback { margin-top: 2rem; }',
+      '    .fea-graph-fallback summary { cursor: pointer; font-weight: 600; padding: 0.25rem 0; }',
+      '    .fea-graph-fallback table { width: 100%; border-collapse: collapse; font-size: 0.875rem; margin-top: 0.75rem; }',
+      '    .fea-graph-fallback th, .fea-graph-fallback td {',
+      '      text-align: left; padding: 0.35rem 0.5rem;',
+      '      border-bottom: 1px solid var(--sl-color-gray-6, #f1f5f9);',
+      '    }',
+      '    .fea-graph-fallback th { background: var(--sl-color-gray-7, #f8fafc); font-weight: 600; }',
+      '  </style>',
+    ].join('\n');
+
+    const canvasEl = [
+      '  ' + emptyStateMessage,
+      '  <div id="fea-graph-wrap" aria-label="Knowledge graph visualisation" role="img">',
+      '    <canvas id="fea-graph-canvas" tabindex="0"',
+      '      aria-label="Force-directed knowledge graph. Use the table below for a non-visual list of pages and connections.">' +
+        '</canvas>',
+      '  </div>',
+    ].join('\n');
+
+    const fallbackSection = [
+      '  <details class="fea-graph-fallback">',
+      '    <summary>All pages and connections (table)</summary>',
+      '    <h3>Pages</h3>',
+      '    <table>',
+      '      <thead><tr><th>Title</th><th>Route</th><th>Tags</th></tr></thead>',
+      '      <tbody>',
+      '        ' + (fallbackRows || noPagesFallback),
+      '      </tbody>',
+      '    </table>',
+      '    <h3>Connections</h3>',
+      '    <table>',
+      '      <thead><tr><th>From</th><th>To</th><th>Type</th></tr></thead>',
+      '      <tbody>',
+      '        ' + (fallbackEdgeRows || noEdgesFallback),
+      '      </tbody>',
+      '    </table>',
+      '  </details>',
+    ].join('\n');
+
+    // Inline client-side force simulation script.
+    // Written as joined lines so esbuild does not misinterpret the JS content
+    // (which references canvas/DOM APIs) as TypeScript source.
+    const scriptLines = [
+      '  <script is:inline define:vars={{ GRAPH_DATA }}>',
+      '    (function () {',
+      "      const canvas = document.getElementById('fea-graph-canvas');",
+      '      if (!canvas) return;',
+      "      const ctx = canvas.getContext('2d');",
+      '      if (!ctx) return;',
+      '      const nodes = (GRAPH_DATA.nodes || []).map((n) => ({',
+      '        id: n.id, title: n.title, route: n.route,',
+      '        x: Math.random() * 600 + 100, y: Math.random() * 400 + 60, vx: 0, vy: 0,',
+      '      }));',
+      '      const edges = (GRAPH_DATA.edges || []).map((e) => ({',
+      '        source: nodes.findIndex((n) => n.id === e.source),',
+      '        target: nodes.findIndex((n) => n.id === e.target),',
+      "        type: e.type || '',",
+      '      })).filter((e) => e.source >= 0 && e.target >= 0);',
+      '      if (nodes.length === 0) return;',
+      '      var K_REPEL=4000, K_SPRING=0.04, REST_LEN=120, K_CENTRE=0.006, DAMPING=0.88;',
+      '      function tick() {',
+      '        var cx=canvas.width/2, cy=canvas.height/2;',
+      '        for (var i=0;i<nodes.length;i++) for (var j=i+1;j<nodes.length;j++) {',
+      '          var dx=nodes[i].x-nodes[j].x, dy=nodes[i].y-nodes[j].y;',
+      '          var dist=Math.sqrt(dx*dx+dy*dy)||1, force=K_REPEL/(dist*dist);',
+      '          var fx=(dx/dist)*force, fy=(dy/dist)*force;',
+      '          nodes[i].vx+=fx; nodes[i].vy+=fy; nodes[j].vx-=fx; nodes[j].vy-=fy;',
+      '        }',
+      '        for (var k=0;k<edges.length;k++) {',
+      '          var s=nodes[edges[k].source], t=nodes[edges[k].target];',
+      '          var ex=t.x-s.x, ey=t.y-s.y, ed=Math.sqrt(ex*ex+ey*ey)||1;',
+      '          var stretch=ed-REST_LEN, efx=(ex/ed)*K_SPRING*stretch, efy=(ey/ed)*K_SPRING*stretch;',
+      '          s.vx+=efx; s.vy+=efy; t.vx-=efx; t.vy-=efy;',
+      '        }',
+      '        for (var m=0;m<nodes.length;m++) {',
+      '          nodes[m].vx+=(cx-nodes[m].x)*K_CENTRE; nodes[m].vy+=(cy-nodes[m].y)*K_CENTRE;',
+      '          nodes[m].vx*=DAMPING; nodes[m].vy*=DAMPING;',
+      '          nodes[m].x+=nodes[m].vx; nodes[m].y+=nodes[m].vy;',
+      '        }',
+      '      }',
+      '      for (var ii=0;ii<120;ii++) tick();',
+      '      var NODE_R=8;',
+      "      function isDark() { return document.documentElement.getAttribute('data-theme')==='dark'; }",
+      '      function colours() {',
+      "        return isDark() ? {edge:'#4b5563',node:'#6366f1',nodeHover:'#a5b4fc',text:'#e5e7eb'}",
+      "                        : {edge:'#cbd5e1',node:'#6366f1',nodeHover:'#4338ca',text:'#1e293b'};",
+      '      }',
+      '      function resizeCanvas() {',
+      '        var rect=canvas.parentElement.getBoundingClientRect();',
+      '        canvas.width=rect.width||800; canvas.height=520;',
+      '      }',
+      '      resizeCanvas();',
+      '      window.addEventListener("resize", function() { resizeCanvas(); draw(); });',
+      '      var hoveredNode=null, frameCount=0, rafId=null;',
+      '      function draw() {',
+      '        var c=colours();',
+      '        ctx.clearRect(0,0,canvas.width,canvas.height);',
+      '        ctx.strokeStyle=c.edge; ctx.lineWidth=1.5;',
+      '        for (var p=0;p<edges.length;p++) {',
+      '          ctx.beginPath();',
+      '          ctx.moveTo(nodes[edges[p].source].x,nodes[edges[p].source].y);',
+      '          ctx.lineTo(nodes[edges[p].target].x,nodes[edges[p].target].y);',
+      '          ctx.stroke();',
+      '        }',
+      '        for (var q=0;q<nodes.length;q++) {',
+      '          var nd=nodes[q], isHov=hoveredNode===nd;',
+      '          ctx.beginPath(); ctx.arc(nd.x,nd.y,NODE_R+(isHov?3:0),0,Math.PI*2);',
+      '          ctx.fillStyle=isHov?c.nodeHover:c.node; ctx.fill();',
+      "          ctx.fillStyle=c.text; ctx.font='11px system-ui,sans-serif'; ctx.textAlign='center';",
+      '          var lbl=nd.title.length>18?nd.title.slice(0,16)+"\u2026":nd.title;',
+      '          ctx.fillText(lbl,nd.x,nd.y+NODE_R+13);',
+      '        }',
+      '      }',
+      '      function animate() { tick(); draw(); frameCount++; if(frameCount<180) rafId=requestAnimationFrame(animate); }',
+      '      animate();',
+      '      function nodeAt(x,y) {',
+      '        return nodes.find(function(n){var dx=n.x-x,dy=n.y-y;return Math.sqrt(dx*dx+dy*dy)<=NODE_R+4;})||null;',
+      '      }',
+      '      function getPos(ev) {',
+      '        var r=canvas.getBoundingClientRect();',
+      '        return {x:(ev.clientX-r.left)*(canvas.width/r.width),y:(ev.clientY-r.top)*(canvas.height/r.height)};',
+      '      }',
+      '      var dragging=null, dragOffset={x:0,y:0};',
+      '      canvas.addEventListener("mousemove",function(ev){',
+      '        var pos=getPos(ev);',
+      '        if(dragging){dragging.x=pos.x-dragOffset.x;dragging.y=pos.y-dragOffset.y;dragging.vx=0;dragging.vy=0;if(rafId===null){frameCount=0;animate();}return;}',
+      '        var hit=nodeAt(pos.x,pos.y);',
+      '        if(hit!==hoveredNode){hoveredNode=hit;canvas.style.cursor=hit?"pointer":"grab";draw();}',
+      '      });',
+      '      canvas.addEventListener("mousedown",function(ev){',
+      '        var pos=getPos(ev),hit=nodeAt(pos.x,pos.y);',
+      '        if(hit){dragging=hit;dragOffset={x:pos.x-hit.x,y:pos.y-hit.y};}',
+      '      });',
+      '      window.addEventListener("mouseup",function(ev){',
+      '        if(dragging){var pos=getPos(ev),hit=nodeAt(pos.x,pos.y);',
+      "          if(hit===dragging&&Math.abs(dragOffset.x)<4&&Math.abs(dragOffset.y)<4){window.location.href=hit.route+'/';}",
+      '          dragging=null;}',
+      '      });',
+      '      canvas.addEventListener("mouseleave",function(){if(!dragging){hoveredNode=null;draw();}});',
+      '      var focusedNodeIdx=0;',
+      '      canvas.addEventListener("keydown",function(ev){',
+      '        if(nodes.length===0)return;',
+      "        if(ev.key==='ArrowRight'){focusedNodeIdx=(focusedNodeIdx+1)%nodes.length;}",
+      "        else if(ev.key==='ArrowLeft'){focusedNodeIdx=(focusedNodeIdx-1+nodes.length)%nodes.length;}",
+      "        else if(ev.key==='Enter'){window.location.href=nodes[focusedNodeIdx].route+'/';return;}",
+      '        else return;',
+      '        ev.preventDefault();hoveredNode=nodes[focusedNodeIdx];draw();',
+      '      });',
+      '      canvas.addEventListener("focus",function(){if(nodes.length>0){hoveredNode=nodes[focusedNodeIdx];draw();}});',
+      '      canvas.addEventListener("blur",function(){hoveredNode=null;draw();});',
+      '      new MutationObserver(function(){draw();}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});',
+      '    })();',
+      '  </script>',
+    ].join('\n');
+
+    const openTag = '<' + 'StarlightPage frontmatter={{ title: \'Knowledge Graph\', description: \'Visual overview of page relationships.\' }}>';
+    const closeTag = '</' + 'StarlightPage>';
+
+    const page = [
+      frontmatter,
+      openTag,
+      style,
+      canvasEl,
+      fallbackSection,
+      scriptLines,
+      closeTag,
+      '',
+    ].join('\n');
+
+    fs.writeFileSync(path.join(pagesDir, 'graph.astro'), page);
+  }
+
+  /** Escape a string for safe embedding in HTML attribute values and text. */
+  private escapeHtml(str: string): string {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   private async installDeps(): Promise<void> {
