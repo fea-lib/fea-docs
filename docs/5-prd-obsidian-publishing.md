@@ -689,12 +689,12 @@ Ensure Pagefind indexes only target-public, searchable normalized content after 
 
 ### Acceptance Criteria
 
-- [ ] Pages public for the selected target are included in Pagefind by default.
-- [ ] Pages with `pagefind: false` or equivalent metadata are excluded.
-- [ ] Private and cross-target pages are excluded from indexing.
-- [ ] Private or cross-target embedded content cannot enter the search index.
-- [ ] Search works in static build output.
-- [ ] Tests verify search inclusion and exclusion behavior on POC repository content.
+- [x] Pages public for the selected target are included in Pagefind by default.
+- [x] Pages with `pagefind: false` or equivalent metadata are excluded.
+- [x] Private and cross-target pages are excluded from indexing.
+- [x] Private or cross-target embedded content cannot enter the search index.
+- [x] Search works in static build output.
+- [x] Tests verify search inclusion and exclusion behavior on POC repository content.
 
 ## Phase 10: Configuration, Publishing Destinations, and Author Documentation
 
