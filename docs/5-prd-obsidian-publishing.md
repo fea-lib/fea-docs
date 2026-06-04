@@ -629,15 +629,15 @@ Normalize Obsidian-style embeds for simple notes, selected headings, explicit bl
 
 ### Acceptance Criteria
 
-- [ ] `![[Note]]` normalizes to a clearly bounded embedded note when the note is public for the selected target.
-- [ ] `![[Note#Heading]]` normalizes to the selected target-public section.
-- [ ] `![[Note#^block-id]]` normalizes to the targeted target-public block.
-- [ ] `![[asset.ext]]` normalizes to supported target-public image/media assets.
-- [ ] Embeds respect target-based public/private filtering for both source notes and assets.
-- [ ] Recursive embed loops are detected and reported.
-- [ ] Explicit `^block-id` markers produce stable block anchors in target-public content.
-- [ ] Embedded content cannot cause private or cross-target content to enter normalized docs, static output, or search.
-- [ ] Tests cover note embeds, heading embeds, asset embeds, unresolved embeds, private embeds, recursive embeds, and unsupported block embeds.
+- [x] `![[Note]]` normalizes to a clearly bounded embedded note when the note is public for the selected target.
+- [x] `![[Note#Heading]]` normalizes to the selected target-public section.
+- [x] `![[Note#^block-id]]` normalizes to the targeted target-public block.
+- [x] `![[asset.ext]]` normalizes to supported target-public image/media assets.
+- [x] Embeds respect target-based public/private filtering for both source notes and assets.
+- [x] Recursive embed loops are detected and reported.
+- [x] Explicit `^block-id` markers produce stable block anchors in target-public content.
+- [x] Embedded content cannot cause private or cross-target content to enter normalized docs, static output, or search.
+- [x] Tests cover note embeds, heading embeds, asset embeds, unresolved embeds, private embeds, recursive embeds, and unsupported block embeds.
 
 ## Phase 7: Backlinks
 

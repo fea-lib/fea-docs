@@ -9,6 +9,7 @@ import { createObsidianHandlers } from '@fea-docs/obsidian';
 import { deriveTitle, extractMetadata } from './metadata.js';
 import { extractAssetReferences, selectStaticFilesToCopy } from './assets.js';
 import { buildPageIndex, resolveWikilink, transformWikilinks, type PageRef, type WikilinkOccurrence } from './wikilinks.js';
+import { expandEmbeds, injectBlockAnchors, type PageMetaForEmbed } from './embeds.js';
 
 // The `ignore` package exports itself differently across module modes.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -310,7 +311,24 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
   // Collect graph edges from wikilink resolution across all pages.
   const allGraphEdges: FeaDocsGraphEdge[] = [];
 
-  // Write pages to output — transform wikilinks in each page's content.
+  // Build metadata map keyed by path for embed privacy checks.
+  const allPageMetaByPath = new Map<string, PageMetaForEmbed>(
+    allPageMetas.map((m) => [
+      m.relativePath,
+      {
+        relativePath: m.relativePath,
+        route: m.route,
+        publishTargets: m.publishTargets,
+        isExplicitlyPrivate: m.isExplicitlyPrivate,
+      },
+    ]),
+  );
+
+  // ---------------------------------------------------------------------------
+  // Pass 1: Wikilinks + callouts → build transformedPages map.
+  // ---------------------------------------------------------------------------
+  const transformedPages = new Map<string, string>();
+
   for (const page of pages) {
     const { content: transformed, edges, diagnostics: wikilinkDiags } = transformWikilinks(
       page.rawContent,
@@ -378,15 +396,55 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
         sd.suggestion,
       );
     }
-    const finalContent = syntaxResult.content;
 
-    // Write transformed content (may differ from source if wikilinks were resolved).
+    // Store the wikilink+callout transformed content for use in embed expansion.
+    transformedPages.set(page.relativePath, syntaxResult.content);
+  }
+
+  // Fail strict builds if wikilink/callout errors were introduced.
+  if (options.strict && diagnostics.diagnostics.some((d) => d.severity === 'error')) {
+    writeJson(path.join(outputRoot, artifactFileNames.diagnostics), diagnostics);
+    throw new Error('Normalization failed due to strict diagnostics.');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pass 2: Embed expansion + block anchor injection → write output files.
+  // ---------------------------------------------------------------------------
+  const allStaticFilesSet = new Set(allStaticFiles.map((f) => f.replace(/\\/g, '/')));
+  const expandCache = new Map<string, string>();
+
+  for (const page of pages) {
+    const afterPass1 = transformedPages.get(page.relativePath)!;
+
+    // Expand ![[...]] embed references.
+    const embedResult = expandEmbeds(afterPass1, {
+      sourcePath: page.relativePath,
+      sourceRoute: page.route,
+      targetId: options.targetId,
+      strict: options.strict ?? false,
+      transformedPages,
+      pageIndex,
+      allPageIndex,
+      allPageMetaByPath,
+      allStaticFilesSet,
+      resolvingStack: [],
+      expandCache,
+    });
+
+    for (const ed of embedResult.diagnostics) {
+      addDiagnostic(ed.code, ed.severity, ed.message, ed.sourcePath, ed.suggestion, ed.location);
+    }
+
+    // Inject block anchors (^block-id → <span id="block-id"></span>).
+    const finalContent = injectBlockAnchors(embedResult.content);
+
+    // Write final content.
     const outputFilePath = path.join(outputRoot, page.outputPath);
     fs.mkdirSync(path.dirname(outputFilePath), { recursive: true });
     fs.writeFileSync(outputFilePath, finalContent, 'utf-8');
   }
 
-  // Fail strict builds if wikilink errors were introduced.
+  // Fail strict builds if embed errors were introduced.
   if (options.strict && diagnostics.diagnostics.some((d) => d.severity === 'error')) {
     writeJson(path.join(outputRoot, artifactFileNames.diagnostics), diagnostics);
     throw new Error('Normalization failed due to strict diagnostics.');
@@ -400,7 +458,6 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
   // Asset validation: check that every asset/static-file referenced by
   // target-public pages actually exists in the vault's discovered files.
   // ---------------------------------------------------------------------------
-  const allStaticFilesSet = new Set(allStaticFiles.map((f) => f.replace(/\\/g, '/')));
   for (const page of pages) {
     const { relativePaths } = extractAssetReferences(page.rawContent, page.relativePath);
     for (const refPath of relativePaths) {
