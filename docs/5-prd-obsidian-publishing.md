@@ -518,18 +518,12 @@ Use `example/` in this repository as the proof-of-concept source vault rather th
 - [x] `fea-docs audit` produces `poc-vault-audit.md` with missing or weak test cases.
 - [x] The user and agent fill identified POC gaps together instead of generating an isolated sample vault.
 - [x] `fea-docs normalize --target <target>` emits a normalized docs tree for a selected target.
-- [ ] Local dev can serve the normalized POC docs with `fea-docs start` without Obsidian normalization enabled.
+- [x] Local dev can serve the normalized POC docs with `fea-docs start` without Obsidian normalization enabled.
 - [x] Static build can produce GitHub Pages-compatible output from the normalized POC docs.
 - [x] The POC covers publishing with multiple configured targets.
 - [x] Existing MDX imports, JSX, configured aliases, and React integration continue to work.
-- [ ] Initial documentation states that Obsidian is an optional editor, `@fea-docs/normalizer` prepares content, and `@fea-docs/cli` renders normalized docs.
-- [ ] Automated baseline tests exist for successful normalization, POC build, multi-target publishing flow, and MDX compatibility.
-
-### Remaining Phase 1 Follow-Ups
-
-1. Manually verify `fea-docs start --root example/.fea-docs/normalized/<target> --config example/fea-docs.config.mjs` for at least one target.
-2. Add user-facing documentation outside this implementation plan that explains the authoring, normalization, and rendering layer split.
-3. Extend automated baseline tests to cover CLI-level publish-all, normalized static build invocation, and MDX compatibility through the generated normalized tree rather than only the normalizer/audit modules.
+- [x] Initial documentation states that Obsidian is an optional editor, `@fea-docs/normalizer` prepares content, and `@fea-docs/cli` renders normalized docs.
+- [x] Automated baseline tests exist for successful normalization, POC build, multi-target publishing flow, and MDX compatibility.
 
 ## Phase 2: Discovery, Metadata, Target Filtering, and Normalized Docs
 

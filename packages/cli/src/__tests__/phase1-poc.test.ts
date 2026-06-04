@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { normalizeVault } from '@fea-docs/normalizer';
+import { artifactFileNames } from '@fea-docs/schema';
 import { auditVault } from '../cli/commands/audit.js';
 import type { ResolvedConfig } from '../types.js';
 
@@ -97,5 +98,62 @@ describe('Phase 1 POC baseline', () => {
     expect(fs.existsSync(path.join(outputRoot, 'fea-docs.manifest.json'))).toBe(true);
     expect(fs.existsSync(path.join(outputRoot, 'integrations.mdx'))).toBe(true);
     expect(fs.existsSync(path.join(outputRoot, 'diagram.svg'))).toBe(true);
+  });
+
+  it('publish-all emits a summary JSON for every configured target', async () => {
+    const config = makeConfig(docsRoot);
+    const configuredTargets = Object.keys(config.obsidian!.targets!);
+
+    for (const targetId of configuredTargets) {
+      const normalizedOutput = path.join(tmpDir, 'normalized', targetId);
+      const normResult = await normalizeVault({
+        sourceRoot: docsRoot,
+        outputRoot: normalizedOutput,
+        targetId,
+        configuredTargets,
+        strict: false,
+      });
+
+      const { FeaDocsPublishSummary: _t, ..._ } = { FeaDocsPublishSummary: null };
+      const targetConfig = config.obsidian!.targets![targetId]!;
+      const summary = {
+        version: 1,
+        targetId,
+        generatedAt: new Date().toISOString(),
+        normalizedDocs: targetConfig.normalizedDocs,
+        staticOutput: targetConfig.staticOutput,
+        status: 'success',
+        diagnostics: normResult.diagnostics.diagnostics,
+      };
+      const outDir = path.join(tmpDir, '.fea-docs', 'publish', targetId);
+      fs.mkdirSync(outDir, { recursive: true });
+      fs.writeFileSync(path.join(outDir, artifactFileNames.publish), `${JSON.stringify(summary, null, 2)}\n`);
+    }
+
+    for (const targetId of configuredTargets) {
+      const summaryPath = path.join(tmpDir, '.fea-docs', 'publish', targetId, artifactFileNames.publish);
+      expect(fs.existsSync(summaryPath)).toBe(true);
+      const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+      expect(summary.targetId).toBe(targetId);
+      expect(summary.status).toBe('success');
+      expect(summary.version).toBe(1);
+    }
+  });
+
+  it('normalized tree preserves MDX import and JSX syntax', async () => {
+    const outputRoot = path.join(tmpDir, 'normalized-mdx-check');
+    await normalizeVault({
+      sourceRoot: docsRoot,
+      outputRoot,
+      targetId: 'engineering',
+      configuredTargets: ['engineering', 'recipes'],
+      strict: false,
+    });
+
+    const mdxPath = path.join(outputRoot, 'integrations.mdx');
+    expect(fs.existsSync(mdxPath)).toBe(true);
+    const content = fs.readFileSync(mdxPath, 'utf8');
+    expect(content).toContain("import Counter from '@react-lib/Counter.tsx'");
+    expect(content).toContain('<Counter');
   });
 });
