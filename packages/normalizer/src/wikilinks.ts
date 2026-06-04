@@ -93,6 +93,8 @@ export interface WikilinkDiagnostic {
   sourcePath: string;
   suggestion: string;
   location?: { line: number };
+  /** The raw wikilink target string, present on UNRESOLVED_WIKILINK for post-processing. */
+  wikilinkTarget?: string;
 }
 
 /** Result of transforming a single page's wikilinks. */
@@ -468,6 +470,7 @@ function replaceWikilinks(
       sourcePath,
       suggestion: `Check that the target page exists and is published to this target.`,
       location: { line: lineNumber },
+      wikilinkTarget: target,
     });
     return raw;
   });

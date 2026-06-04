@@ -588,14 +588,14 @@ Extend normalization-layer validation so pages public for the selected target ca
 
 ### Acceptance Criteria
 
-- [ ] Public-to-private and cross-target page links produce development warnings and strict build failures.
-- [ ] Public-to-private and cross-target asset/static-file references produce development warnings and strict build failures.
-- [ ] Unresolved Markdown images or linked static files referenced by pages public for the selected target fail strict builds.
-- [ ] Unresolved MDX asset imports or static-file references on pages public for the selected target remain visible as MDX/build errors.
-- [ ] Only assets and static files reachable from pages public for the selected target or explicitly public asset directories for that target are emitted into normalized docs/static output.
-- [ ] Ignored, private, and cross-target asset/static-file paths are not emitted accidentally.
-- [ ] Diagnostics include source location where feasible and actionable suggested fixes.
-- [ ] Tests cover private page leaks, cross-target page leaks, private asset leaks, cross-target asset leaks, private static-file leaks, ignored assets/static files, and allowed target-public assets/static files.
+- [x] Public-to-private and cross-target page links produce development warnings and strict build failures.
+- [x] Public-to-private and cross-target asset/static-file references produce development warnings and strict build failures.
+- [x] Unresolved Markdown images or linked static files referenced by pages public for the selected target fail strict builds.
+- [x] Unresolved MDX asset imports or static-file references on pages public for the selected target remain visible as MDX/build errors.
+- [x] Only assets and static files reachable from pages public for the selected target or explicitly public asset directories for that target are emitted into normalized docs/static output.
+- [x] Ignored, private, and cross-target asset/static-file paths are not emitted accidentally.
+- [x] Diagnostics include source location where feasible and actionable suggested fixes.
+- [x] Tests cover private page leaks, cross-target page leaks, private asset leaks, cross-target asset leaks, private static-file leaks, ignored assets/static files, and allowed target-public assets/static files.
 
 ## Phase 5: Isolated Syntax Normalization Engine and Callouts
 

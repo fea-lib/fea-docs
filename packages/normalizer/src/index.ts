@@ -5,8 +5,8 @@ import matter from 'gray-matter';
 import ignoreLib from 'ignore';
 import { artifactFileNames, type FeaDocsDiagnosticsFile, type FeaDocsGraphEdge, type FeaDocsManifest } from '@fea-docs/schema';
 import { deriveTitle, extractMetadata } from './metadata.js';
-import { selectStaticFilesToCopy } from './assets.js';
-import { buildPageIndex, transformWikilinks, type PageRef } from './wikilinks.js';
+import { extractAssetReferences, selectStaticFilesToCopy } from './assets.js';
+import { buildPageIndex, resolveWikilink, transformWikilinks, type PageRef, type WikilinkOccurrence } from './wikilinks.js';
 
 // The `ignore` package exports itself differently across module modes.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -65,6 +65,20 @@ interface FilterDecision {
   reason: 'ignored' | 'draft' | 'private' | 'not-for-target';
 }
 
+/** Metadata for every scanned page, including private/non-target ones, for privacy checking. */
+interface AllPageMeta {
+  relativePath: string;
+  route: string;
+  title: string;
+  aliases: string[];
+  headings: Array<{ text: string; anchor: string }>;
+  blockIds: string[];
+  /** Configured targets this page is published to (empty = private / no publish). */
+  publishTargets: string[];
+  /** True when publish is false, undefined, or not a string/array of known targets. */
+  isExplicitlyPrivate: boolean;
+}
+
 export async function normalizeVault(options: NormalizeOptions): Promise<NormalizeResult> {
   const sourceRoot = path.resolve(options.sourceRoot);
   const outputRoot = path.resolve(options.outputRoot);
@@ -113,6 +127,7 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
   const filterDecisions: FilterDecision[] = [];
   const pages: SourcePage[] = [];
   const allStaticFiles: string[] = [];
+  const allPageMetas: AllPageMeta[] = [];
 
   for (const relativePath of filteredFiles) {
     const absolutePath = path.join(sourceRoot, relativePath);
@@ -168,6 +183,22 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
           'Add a frontmatter title or an H1 heading to the page.',
         );
       }
+
+      // Collect metadata for ALL pages (including private/non-target) for privacy validation.
+      const pagePublishTargets = publishTargets(fm.publish as PublishValue)
+        .filter((t) => configuredTargets.has(t));
+      const isExplicitlyPrivate =
+        fm.publish === false || fm.publish === undefined || fm.publish === true;
+      allPageMetas.push({
+        relativePath,
+        route: routeFor(relativePath),
+        title,
+        aliases: meta.aliases,
+        headings: meta.headings,
+        blockIds: meta.blockIds,
+        publishTargets: pagePublishTargets,
+        isExplicitlyPrivate,
+      });
 
       // Filter: draft pages.
       if (fm.draft === true) {
@@ -259,6 +290,18 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
   }));
   const pageIndex = buildPageIndex(pageRefs);
 
+  // Build a full page index (all pages, not just target-public) for privacy classification.
+  const allPageRefs: PageRef[] = allPageMetas.map((m) => ({
+    relativePath: m.relativePath,
+    route: m.route,
+    title: m.title,
+    aliases: m.aliases,
+    headings: m.headings,
+    blockIds: m.blockIds,
+  }));
+  const allPageIndex = buildPageIndex(allPageRefs);
+  const allPageMetaByRoute = new Map(allPageMetas.map((m) => [m.route, m]));
+
   // Collect graph edges from wikilink resolution across all pages.
   const allGraphEdges: FeaDocsGraphEdge[] = [];
 
@@ -272,8 +315,44 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
       options.strict ?? false,
     );
 
-    // Surface wikilink diagnostics.
+    // Surface wikilink diagnostics, reclassifying unresolved links that point
+    // to private or cross-target pages with more specific diagnostic codes.
     for (const d of wikilinkDiags) {
+      if (d.code === 'UNRESOLVED_WIKILINK' && d.wikilinkTarget) {
+        const occurrence: WikilinkOccurrence = {
+          raw: `[[${d.wikilinkTarget}]]`,
+          target: d.wikilinkTarget,
+          fragment: null,
+          pipeAlias: null,
+        };
+        const allResolution = resolveWikilink(occurrence, allPageIndex);
+        if (allResolution.status === 'resolved') {
+          const meta = allPageMetaByRoute.get(allResolution.page.route);
+          if (meta) {
+            if (meta.publishTargets.length === 0 || meta.isExplicitlyPrivate) {
+              addDiagnostic(
+                'PRIVATE_PAGE_LINK',
+                options.strict ? 'error' : 'warning',
+                `Wikilink [[${d.wikilinkTarget}]] references a private page ("${allResolution.page.relativePath}") not published to any target.`,
+                d.sourcePath,
+                'Remove the link or add the target page to a configured publishing target.',
+                d.location,
+              );
+              continue;
+            } else if (!meta.publishTargets.includes(options.targetId)) {
+              addDiagnostic(
+                'CROSS_TARGET_PAGE_LINK',
+                options.strict ? 'error' : 'warning',
+                `Wikilink [[${d.wikilinkTarget}]] references a page ("${allResolution.page.relativePath}") assigned to a different target (${meta.publishTargets.join(', ')}).`,
+                d.sourcePath,
+                `Add "${options.targetId}" to the target page's publish frontmatter or remove the link.`,
+                d.location,
+              );
+              continue;
+            }
+          }
+        }
+      }
       addDiagnostic(d.code, d.severity, d.message, d.sourcePath, d.suggestion, d.location);
     }
 
@@ -293,6 +372,33 @@ export async function normalizeVault(options: NormalizeOptions): Promise<Normali
 
   for (const staticFile of staticFilesToCopy) {
     copyFile(path.join(sourceRoot, staticFile), path.join(outputRoot, staticFile));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Asset validation: check that every asset/static-file referenced by
+  // target-public pages actually exists in the vault's discovered files.
+  // ---------------------------------------------------------------------------
+  const allStaticFilesSet = new Set(allStaticFiles.map((f) => f.replace(/\\/g, '/')));
+  for (const page of pages) {
+    const { relativePaths } = extractAssetReferences(page.rawContent, page.relativePath);
+    for (const refPath of relativePaths) {
+      const normalised = refPath.replace(/\\/g, '/');
+      if (!allStaticFilesSet.has(normalised)) {
+        addDiagnostic(
+          'UNRESOLVED_ASSET',
+          options.strict ? 'error' : 'warning',
+          `Asset reference "${refPath}" in "${page.relativePath}" could not be resolved — file not found in the vault.`,
+          page.relativePath,
+          'Check that the file exists and is not excluded by ignore patterns.',
+        );
+      }
+    }
+  }
+
+  // Fail strict builds if asset validation errors were introduced.
+  if (options.strict && diagnostics.diagnostics.some((d) => d.severity === 'error')) {
+    writeJson(path.join(outputRoot, artifactFileNames.diagnostics), diagnostics);
+    throw new Error('Normalization failed due to strict diagnostics.');
   }
 
   const manifest: FeaDocsManifest = {

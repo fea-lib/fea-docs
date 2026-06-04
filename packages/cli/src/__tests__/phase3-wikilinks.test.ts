@@ -332,9 +332,10 @@ describe('Unresolved wikilinks', () => {
     const outputRoot = path.join(tmpDir, 'out');
     const result = await normalizeVault(baseOptions(sourceRoot, outputRoot));
 
-    // 'Other' is not public for engineering target, so the wikilink cannot resolve.
-    const unresolved = result.diagnostics.diagnostics.filter((d) => d.code === 'UNRESOLVED_WIKILINK');
-    expect(unresolved.length).toBeGreaterThan(0);
+    // 'Other' is public for 'recipes' but not 'engineering', so Phase 4 classifies
+    // this as a cross-target link rather than a generic unresolved wikilink.
+    const crossTarget = result.diagnostics.diagnostics.filter((d) => d.code === 'CROSS_TARGET_PAGE_LINK');
+    expect(crossTarget.length).toBeGreaterThan(0);
   });
 });
 
