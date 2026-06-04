@@ -1,5 +1,5 @@
 ---
-title: "PRD: fea-docs (v1.0)"
+title: "1.0: fea-docs"
 ---
 
 ## Problem Statement

@@ -1,5 +1,5 @@
 ---
-title: "PRD: Improvements (v2.0)"
+title: "2.0: Improvements"
 ---
 
 ## Context

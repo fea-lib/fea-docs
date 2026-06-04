@@ -1,5 +1,5 @@
 ---
-title: 'PRD: Obsidian Publishing'
+title: '3.0: Obsidian Publishing'
 ---
 
 # PRD: Obsidian-Like Publishing with fea-docs
