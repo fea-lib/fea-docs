@@ -40,6 +40,7 @@ export async function resolveConfig(
   let fileConfig: Partial<ResolvedConfig> = {};
 
   const configPath = configFilePath ?? findConfigInCwd();
+  const configDir = configPath ? path.dirname(path.resolve(configPath)) : process.cwd();
 
   if (configPath) {
     if (!fs.existsSync(configPath)) {
@@ -55,11 +56,16 @@ export async function resolveConfig(
     ...(envPort ? { port: Number(envPort) } : {}),
   };
 
+  const mergedRoot = cliFlags.root
+    ? path.resolve(process.cwd(), cliFlags.root)
+    : path.resolve(configDir, fileConfig.root ?? DEFAULT_CONFIG.root);
+
   return {
     ...DEFAULT_CONFIG,
     ...fileConfig,
     ...envConfig,
     ...cliFlags,
+    root: mergedRoot,
     // Arrays are merged rather than replaced
     ignore: [
       ...(DEFAULT_CONFIG.ignore),

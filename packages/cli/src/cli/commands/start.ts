@@ -16,6 +16,7 @@ export function startCommand(): Command {
     .option('--open', 'Open the browser automatically on start')
     .option('--name <text>', 'Custom docs site name/title')
     .option('--base <path>', 'Base URL path for deployed docs (e.g. /my-repo)')
+    .option('--root <path>', 'Source docs root')
     .option('--config <path>', 'Path to an explicit config file')
     .option('--strict', 'Enable strict validation mode')
     .option(
@@ -32,6 +33,7 @@ export function startCommand(): Command {
         ...(opts.open ? { open: true } : {}),
         ...(opts.name ? { name: String(opts.name) } : {}),
         ...(opts.base ? { base: String(opts.base) } : {}),
+        ...(opts.root ? { root: String(opts.root) } : {}),
         ...(opts.strict ? { strict: true } : {}),
         ...(opts.ignore ? { ignore: opts.ignore } : {}),
         ...(opts.framework ? { frameworks: opts.framework } : {}),
@@ -41,7 +43,6 @@ export function startCommand(): Command {
       };
 
       const config = await resolveConfig(cliFlags, opts.config);
-      config.root = process.cwd();
 
       try {
         // Discover content

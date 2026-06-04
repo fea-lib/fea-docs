@@ -66,6 +66,25 @@ export interface FeaDocsConfig {
   caffeinate?: boolean;
   /** Explicit remote expose consent. */
   expose?: boolean;
+  /** Obsidian-compatible vault publishing configuration. */
+  obsidian?: ObsidianConfig;
+}
+
+export interface PublishDestinationConfig {
+  repo: string;
+  branch: string;
+  path: string;
+}
+
+export interface PublishTargetConfig {
+  label?: string;
+  normalizedDocs?: PublishDestinationConfig;
+  staticOutput?: PublishDestinationConfig;
+}
+
+export interface ObsidianConfig {
+  enabled?: boolean;
+  targets?: Record<string, PublishTargetConfig>;
 }
 
 /** Resolved, merged runtime config (all fields present). */
@@ -83,6 +102,7 @@ export interface ResolvedConfig {
   tailscaleServe: boolean;
   caffeinate: boolean;
   expose: boolean;
+  obsidian?: ObsidianConfig;
 }
 
 /** Diagnostic emitted during validation. */

@@ -81,6 +81,31 @@ describe('resolveConfig', () => {
     const resolved = await resolveConfig({ base: 'from-cli/' });
     expect(resolved.base).toBe('/from-cli');
   });
+
+  it('resolves config root relative to the config file', async () => {
+    writeFile(
+      tmpDir,
+      'example/fea-docs.config.mjs',
+      "export default { root: './docs' };\n",
+    );
+
+    const resolved = await resolveConfig({}, path.join(tmpDir, 'example/fea-docs.config.mjs'));
+    expect(resolved.root).toBe(path.join(tmpDir, 'example', 'docs'));
+  });
+
+  it('resolves CLI root relative to cwd', async () => {
+    writeFile(
+      tmpDir,
+      'example/fea-docs.config.mjs',
+      "export default { root: './docs' };\n",
+    );
+
+    const resolved = await resolveConfig(
+      { root: 'custom-docs' },
+      path.join(tmpDir, 'example/fea-docs.config.mjs'),
+    );
+    expect(resolved.root).toBe(path.join(tmpDir, 'custom-docs'));
+  });
 });
 
 describe('inferConfigFromDocs', () => {

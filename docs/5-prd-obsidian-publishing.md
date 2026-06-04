@@ -493,25 +493,43 @@ Turn the `fea-docs` repository into a simple pnpm workspace monorepo, rename the
 
 ## Phase 1: Repository POC Vault Audit and Pipeline Baseline
 
+**Status**: Baseline implemented. The POC vault is `example/docs`, configured by `example/fea-docs.config.mjs`. `fea-docs audit`, `fea-docs normalize --target <target>`, and `fea-docs publish --all` now exercise the Phase 1 flow for the `engineering` and `recipes` targets. Normalization is intentionally pass-through at this phase: target-public Markdown, MDX, static assets, and baseline artifact JSON are emitted without Obsidian syntax transformation.
+
 **User stories covered**: 1, 2, 28, 31, 33, 34, 35, 38, 39
 
 ### What to Build
 
-Use this repository as the proof-of-concept source vault rather than creating a separate sample vault. The user will manually shape the repository into the POC vault. The agent will audit the repository against the required end-to-end cases, highlight missing test-case coverage, and then fill those gaps with the user. Establish the baseline pipeline that proves a normalized docs tree can be handed from `@fea-docs/normalizer` to `@fea-docs/cli` for preview and static builds. At this phase, normalization can be a pass-through copy for content that needs no Obsidian handling.
+Use `example/` in this repository as the proof-of-concept source vault rather than creating a separate sample vault. The vault source root is `example/docs`. The agent audits the example vault against the required end-to-end cases, highlights missing test-case coverage, and fills those gaps in the example vault. Establish the baseline pipeline that proves a normalized docs tree can be handed from `@fea-docs/normalizer` to `@fea-docs/cli` for preview and static builds. At this phase, normalization can be a pass-through copy for target-public content and does not transform Obsidian syntax yet.
+
+### Implemented Baseline
+
+1. `example/fea-docs.config.mjs` defines the example vault root, framework aliases, and two publishing targets: `engineering` and `recipes`.
+2. `example/docs` includes POC coverage for `.md`, `.mdx`, arbitrary static files, target-specific public/private metadata, multiple publishing targets, wikilinks, callouts, embeds, block IDs, backlink candidates, graph candidates, search inclusion/exclusion, and MDX component usage.
+3. `@fea-docs/normalizer` emits target-filtered pass-through normalized docs under `example/.fea-docs/normalized/<target>`.
+4. Normalization emits `fea-docs.manifest.json`, `fea-docs.diagnostics.json`, `fea-docs.graph.json`, `fea-docs.backlinks.json`, and `fea-docs.search.json` as baseline artifacts.
+5. `fea-docs audit` writes `example/poc-vault-audit.md` and currently reports all Phase 1 POC coverage checks as present.
+6. `fea-docs publish --all` writes baseline per-target publish summaries under `example/.fea-docs/publish/<target>`.
+7. Static builds from both normalized target trees have been manually verified with `fea-docs build --root example/.fea-docs/normalized/<target>`.
 
 ### Acceptance Criteria
 
-- [ ] This repository is treated as the POC source vault for the end-to-end flow.
-- [ ] The agent audits the repository for required POC coverage: `.md`, `.mdx`, arbitrary static files, target-specific public/private metadata, multiple publishing targets, wikilinks, callouts, embeds, block IDs, backlink candidates, graph candidates, search inclusion/exclusion, MDX component usage, normalized docs publishing, and static output publishing.
-- [ ] `fea-docs audit` produces `poc-vault-audit.md` with missing or weak test cases.
-- [ ] The user and agent fill identified POC gaps together instead of generating an isolated sample vault.
-- [ ] `fea-docs normalize --target <target>` emits a normalized docs tree for a selected target.
+- [x] `example/` in this repository is treated as the POC source vault for the end-to-end flow.
+- [x] The agent audits the POC vault for required POC coverage: `.md`, `.mdx`, arbitrary static files, target-specific public/private metadata, multiple publishing targets, wikilinks, callouts, embeds, block IDs, backlink candidates, graph candidates, search inclusion/exclusion, MDX component usage, normalized docs publishing, and static output publishing.
+- [x] `fea-docs audit` produces `poc-vault-audit.md` with missing or weak test cases.
+- [x] The user and agent fill identified POC gaps together instead of generating an isolated sample vault.
+- [x] `fea-docs normalize --target <target>` emits a normalized docs tree for a selected target.
 - [ ] Local dev can serve the normalized POC docs with `fea-docs start` without Obsidian normalization enabled.
-- [ ] Static build can produce GitHub Pages-compatible output from the normalized POC docs.
-- [ ] The POC covers publishing with multiple configured targets.
-- [ ] Existing MDX imports, JSX, configured aliases, and React integration continue to work.
+- [x] Static build can produce GitHub Pages-compatible output from the normalized POC docs.
+- [x] The POC covers publishing with multiple configured targets.
+- [x] Existing MDX imports, JSX, configured aliases, and React integration continue to work.
 - [ ] Initial documentation states that Obsidian is an optional editor, `@fea-docs/normalizer` prepares content, and `@fea-docs/cli` renders normalized docs.
 - [ ] Automated baseline tests exist for successful normalization, POC build, multi-target publishing flow, and MDX compatibility.
+
+### Remaining Phase 1 Follow-Ups
+
+1. Manually verify `fea-docs start --root example/.fea-docs/normalized/<target> --config example/fea-docs.config.mjs` for at least one target.
+2. Add user-facing documentation outside this implementation plan that explains the authoring, normalization, and rendering layer split.
+3. Extend automated baseline tests to cover CLI-level publish-all, normalized static build invocation, and MDX compatibility through the generated normalized tree rather than only the normalizer/audit modules.
 
 ## Phase 2: Discovery, Metadata, Target Filtering, and Normalized Docs
 

@@ -20,9 +20,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@fea-docs/schema": "workspace:*"
+    "@fea-docs/schema": "workspace:*",
+    "fast-glob": "^3.3.2",
+    "gray-matter": "^4.0.3",
+    "ignore": "^5.3.2"
   },
   "devDependencies": {
+    "@types/node": "^20.14.0",
     "typescript": "^5.5.0"
   },
   "publishConfig": {

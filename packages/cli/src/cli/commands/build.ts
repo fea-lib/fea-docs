@@ -14,6 +14,7 @@ export function buildCommand(): Command {
     .option('--out-dir <path>', 'Output directory', 'dist')
     .option('--name <text>', 'Custom docs site name/title')
     .option('--base <path>', 'Base URL path for deployed docs (e.g. /my-repo)')
+    .option('--root <path>', 'Source docs root')
     .option('--config <path>', 'Path to an explicit config file')
     .option('--strict', 'Enable strict validation (default in build mode)')
     .option('--ignore <glob...>', 'Additional ignore globs')
@@ -23,12 +24,12 @@ export function buildCommand(): Command {
         strict: true, // build always strict
         ...(opts.name ? { name: String(opts.name) } : {}),
         ...(opts.base ? { base: String(opts.base) } : {}),
+        ...(opts.root ? { root: String(opts.root) } : {}),
         ...(opts.ignore ? { ignore: opts.ignore } : {}),
         ...(opts.framework ? { frameworks: opts.framework } : {}),
       };
 
       const config = await resolveConfig(cliFlags, opts.config);
-      config.root = process.cwd();
 
       try {
         console.log(pc.cyan('Scanning for docs...'));

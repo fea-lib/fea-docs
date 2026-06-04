@@ -6,4 +6,5 @@ export { BuildExporter } from './build/exporter.js';
 export { GithubPagesBootstrapper } from './gh-pages/bootstrapper.js';
 export { SessionCacheManager } from './cache/manager.js';
 export { inferFrameworksFromMdxGraph } from './mdx-framework/inferer.js';
-export type { DocPage, DocsGraph, NavItem, NavTree } from './types.js';
+export { auditVault } from './cli/commands/audit.js';
+export type { DocPage, DocsGraph, FeaDocsConfig, NavItem, NavTree } from './types.js';
