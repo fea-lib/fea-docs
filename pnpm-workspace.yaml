@@ -1,2 +1,5 @@
 packages:
   - packages/*
+
+overrides:
+  semver: "7.6.3"
