@@ -53,7 +53,9 @@ export class RuntimeAdapter {
     await this.writeAstroConfig();
     await this.writeContentLinks();
     await this.writeContentConfig();
-    await this.writeGraphPage();
+    if (this.graphEnabled()) {
+      await this.writeGraphPage();
+    }
     await this.installDeps();
   }
 
@@ -146,6 +148,12 @@ export class RuntimeAdapter {
     const aliasEntries = Object.entries(config.aliases)
       .map(([k, v]) => `'${k}': '${v}'`)
       .join(',\n    ');
+    const sidebarEntries = [
+      "{ autogenerate: { directory: 'docs' } }",
+      ...(this.graphEnabled()
+        ? [`{ label: 'Knowledge Graph', link: ${JSON.stringify(joinBasePath(config.base, '/graph/'))} }`]
+        : []),
+    ];
 
     const astroConfig = `
 import { defineConfig } from 'astro/config';
@@ -161,8 +169,7 @@ export default defineConfig({
     starlight({
       title: ${JSON.stringify(title)},
       sidebar: [
-        { autogenerate: { directory: 'docs' } },
-        { label: 'Knowledge Graph', link: ${JSON.stringify(joinBasePath(config.base, '/graph/'))} },
+        ${sidebarEntries.join(',\n        ')},
       ],
     }),
     ${frameworkIntegrations}
@@ -208,6 +215,10 @@ export default defineConfig({
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1));
 
     return words.length > 0 ? words.join(' ') : 'Docs';
+  }
+
+  private graphEnabled(): boolean {
+    return this.options.config.obsidian?.features?.graph !== false;
   }
 
   /**

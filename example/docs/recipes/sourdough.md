@@ -6,6 +6,6 @@ backlinks: true
 
 # Sourdough
 
-This recipe links to [[Glossary#Shared Term]] and references a private note for future diagnostics: [[private/secret-note|Secret Note]].
+This recipe links to [[Glossary#Shared Term]] for shared terminology.
 
 The starter schedule block is reusable. ^starter-schedule

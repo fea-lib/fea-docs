@@ -337,4 +337,46 @@ describe('RuntimeAdapter graph page', () => {
     expect(astroConfig).toContain('Knowledge Graph');
     expect(astroConfig).toContain('/graph/');
   });
+
+  it('omits the graph sidebar link when graph feature is disabled', async () => {
+    const graph = makeGraph(tmpDir, [
+      { rel: 'index.md', label: 'Home', entryId: 'index', isSectionIndex: true },
+    ]);
+    const config: ResolvedConfig = {
+      ...makeConfig(tmpDir),
+      obsidian: {
+        enabled: true,
+        features: { graph: false },
+      },
+    };
+    const adapter = new RuntimeAdapter({ config, graph });
+    fs.mkdirSync(path.join(adapter.projectDir, 'src', 'pages'), { recursive: true });
+
+    await invokePrivate(adapter, 'writeAstroConfig');
+
+    const astroConfig = fs.readFileSync(path.join(adapter.projectDir, 'astro.config.mjs'), 'utf-8');
+    expect(astroConfig).not.toContain('Knowledge Graph');
+  });
+
+  it('writes keyboard-accessible graph controls and fallback semantics', async () => {
+    const graphData = {
+      version: 1,
+      targetId: 'engineering',
+      nodes: [{ id: '/guide', title: 'Guide', route: '/guide' }],
+      edges: [{ source: '/guide', target: '/guide', type: 'wikilink' }],
+    };
+    fs.writeFileSync(path.join(tmpDir, 'fea-docs.graph.json'), JSON.stringify(graphData));
+
+    const adapter = new RuntimeAdapter({ config: makeConfig(tmpDir), graph: makeGraph(tmpDir, []) });
+    fs.mkdirSync(path.join(adapter.projectDir, 'src', 'pages'), { recursive: true });
+    await invokePrivate(adapter, 'writeGraphPage');
+
+    const content = fs.readFileSync(path.join(adapter.projectDir, 'src', 'pages', 'graph.astro'), 'utf-8');
+    expect(content).toContain('tabindex="0"');
+    expect(content).toContain('aria-label="Force-directed knowledge graph');
+    expect(content).toContain('<details class="fea-graph-fallback">');
+    expect(content).toContain("ev.key==='ArrowRight'");
+    expect(content).toContain("ev.key==='ArrowLeft'");
+    expect(content).toContain("ev.key==='Enter'");
+  });
 });

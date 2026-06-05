@@ -178,7 +178,7 @@ export default {
 | `features.embeds` | `boolean` | `true` | Expand `![[embeds]]` (note, heading, block, asset). |
 | `features.callouts` | `boolean` | `true` | Normalize `> [!callout]` syntax. |
 | `features.backlinks` | `boolean` | `true` | Generate and render backlink data. |
-| `features.graph` | `boolean` | `true` | Emit `fea-docs.graph.json`. |
+| `features.graph` | `boolean` | `true` | Emit graph data and enable the generated graph page/sidebar entry. When `false`, graph UI code is not generated or loaded. |
 | `features.targetAllowlisting` | `boolean` | `true` | Require explicit `publish: <target>` frontmatter. |
 | `strict` | `boolean` | `false` | Fail on strict diagnostics. |
 | `ignorePaths` | `string[]` | `[]` | Additional globs to exclude during discovery. |
@@ -198,6 +198,12 @@ When `obsidian.enabled` is not set (or set to `false`), the `fea-docs` pipeline 
 - All `.md` and `.mdx` files under `root` are served directly.
 
 Existing `fea-docs` usage continues to work with no config changes.
+
+### Graph UI behavior
+
+When `features.graph` is enabled, `@fea-docs/cli` generates a standalone Knowledge Graph page. Its client-side script is scoped to that page only, so regular documentation pages do not load graph UI code. The graph page also includes a keyboard-focusable canvas and a non-visual fallback table listing pages and connections.
+
+Set `obsidian.features.graph: false` to omit the graph page and sidebar link entirely.
 
 ## Page frontmatter
 

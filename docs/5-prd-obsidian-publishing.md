@@ -770,14 +770,14 @@ Optimize and verify the complete normalization, rendering, and publishing pipeli
 
 ### Acceptance Criteria
 
-- [ ] Full normalization/build runs avoid quadratic link-resolution behavior on the POC repository and representative larger vault fixtures.
-- [ ] Incremental development rebuilds reuse cached discovery or graph data where feasible.
-- [ ] Optional graph UI code is not loaded on pages where graph features are disabled.
-- [ ] Callouts, backlinks, and graph controls are keyboard accessible.
-- [ ] Graph visualization has a non-visual fallback.
-- [ ] Generated links have readable text.
-- [ ] Release documentation clearly distinguishes supported Obsidian-like behavior from full Obsidian parity.
-- [ ] Final POC pipeline passes strict mode and produces normalized docs plus static output suitable for configured destinations.
+- [x] Full normalization/build runs avoid quadratic link-resolution behavior on the POC repository and representative larger vault fixtures.
+- [x] Incremental development rebuilds reuse cached discovery or graph data where feasible.
+- [x] Optional graph UI code is not loaded on pages where graph features are disabled.
+- [x] Callouts, backlinks, and graph controls are keyboard accessible.
+- [x] Graph visualization has a non-visual fallback.
+- [x] Generated links have readable text.
+- [x] Release documentation clearly distinguishes supported Obsidian-like behavior from full Obsidian parity.
+- [x] Final POC pipeline passes strict mode and produces normalized docs plus static output suitable for configured destinations.
 
 ## Cross-Cutting Test Matrix
 
