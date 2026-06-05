@@ -3,3 +3,6 @@ packages:
 
 overrides:
   semver: "7.6.3"
+
+onlyBuiltDependencies:
+  - esbuild
