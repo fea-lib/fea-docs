@@ -1,6 +1,6 @@
 {
   "name": "@fea-docs/normalizer",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Normalize source vaults into fea-docs-ready Markdown and MDX trees",
   "type": "module",
   "main": "./dist/index.js",
