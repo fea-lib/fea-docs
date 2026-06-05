@@ -1,26 +1,22 @@
 #!/usr/bin/env bash
 set -e
 
-VERSION="$1"
-MESSAGE="$2"
+# Apply all pending changesets: bumps each package version independently
+# and updates internal dependency ranges.
+#
+# Before running this, create one or more changesets with:
+#   pnpm changeset
+#
+# Usage: ./scripts/publish.sh
 
-if [[ -z "$VERSION" || -z "$MESSAGE" ]]; then
-  echo "Usage: ./scripts/publish.sh <version> <message>"
-  echo "  Example: ./scripts/publish.sh 1.0.5 \"fix cache invalidation\""
+if ! pnpm changeset status --since=main 2>/dev/null | grep -q "changesets"; then
+  echo "No pending changesets found. Run 'pnpm changeset' first."
   exit 1
 fi
 
-# Strip leading 'v' if provided
-VERSION="${VERSION#v}"
-TAG="v${VERSION}"
-
-echo "Publishing ${TAG}: ${MESSAGE}"
-
-pnpm version "$VERSION" --no-git-tag-version
-pnpm --dir packages/cli version "$VERSION" --no-git-tag-version
+pnpm changeset version
 git add .
-git commit -m "${TAG}: ${MESSAGE}"
-git tag "$TAG"
-git push origin main "$TAG"
+git commit -m "chore: version packages"
+git push origin main
 
 echo "Done. GitHub Actions will publish to npm."

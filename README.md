@@ -214,6 +214,39 @@ Tests live alongside source in `packages/cli/src/__tests__/` and cover all deep 
 
 `@fea-docs/schema` defines shared TypeScript types for generated artifacts such as `fea-docs.manifest.json`, `fea-docs.diagnostics.json`, `fea-docs.graph.json`, `fea-docs.backlinks.json`, `fea-docs.search.json`, and `fea-docs.publish.json`.
 
+## Versioning and publishing
+
+This repository uses [Changesets](https://github.com/changesets/changesets) for independent per-package versioning. Each package under `packages/` is published to npm separately and carries its own semver version.
+
+### Adding a changeset
+
+Whenever you make a change that warrants a version bump, create a changeset alongside your code:
+
+```sh
+pnpm changeset
+```
+
+The CLI will ask which packages are affected and what kind of bump each one needs (`patch`, `minor`, or `major`). A markdown file is added to `.changeset/` — commit it with your changes.
+
+### Releasing
+
+Once changesets have been merged to `main`, apply them and push:
+
+```sh
+./scripts/publish.sh
+```
+
+This runs `pnpm changeset version` (bumps each affected package independently and updates internal dependency ranges), commits the result, and pushes to `main`. The CI will then publish every package whose version changed.
+
+### CI behaviour
+
+The `Release` GitHub Actions workflow runs on every push to `main` via `changesets/action`:
+
+- **Pending changesets present** — opens or updates a "Version Packages" pull request with the computed version bumps and generated changelogs.
+- **"Version Packages" PR merged** — publishes each changed package to npm at its new version.
+
+The workflow requires two repository secrets: `GITHUB_TOKEN` (provided automatically) and `NPM_TOKEN` (an npm access token with publish rights to the `@fea-docs` scope).
+
 ## License
 
 MIT
