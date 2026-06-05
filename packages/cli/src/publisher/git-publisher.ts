@@ -136,6 +136,14 @@ export class GitPublisher {
       // Clone the target repo into a temp directory
       git(['clone', '--local', '--no-hardlinks', remoteUrl, tmpDir], { cwd: this.gitRoot });
 
+      // Ensure a committer identity exists in the temp clone (required in CI where no
+      // global user.email / user.name is configured).
+      const hasEmail = gitNoThrow(['config', 'user.email'], { cwd: tmpDir });
+      if (!hasEmail) {
+        git(['config', 'user.email', 'fea-docs-publisher@local'], { cwd: tmpDir });
+        git(['config', 'user.name', 'fea-docs-publisher'], { cwd: tmpDir });
+      }
+
       const branchExists =
         gitNoThrow(['rev-parse', '--verify', `origin/${dest.branch}`], { cwd: tmpDir }) !== null;
 
