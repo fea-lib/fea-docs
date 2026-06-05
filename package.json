@@ -16,5 +16,10 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "semver": "7.6.3"
+    }
   }
 }

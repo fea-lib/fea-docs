@@ -9,7 +9,7 @@ set -e
 #
 # Usage: ./scripts/publish.sh
 
-if ! pnpm changeset status --since=main 2>/dev/null | grep -q "changesets"; then
+if [[ -z "$(ls .changeset/*.md 2>/dev/null | grep -v README.md)" ]]; then
   echo "No pending changesets found. Run 'pnpm changeset' first."
   exit 1
 fi
