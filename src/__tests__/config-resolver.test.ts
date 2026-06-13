@@ -27,6 +27,7 @@ function baseConfig(root: string): ResolvedConfig {
     strict: false,
     frameworks: [],
     aliases: {},
+    dependencies: {},
     tailscaleServe: false,
     caffeinate: false,
     expose: false,
@@ -81,6 +82,39 @@ describe('resolveConfig', () => {
     const resolved = await resolveConfig({ base: 'from-cli/' });
     expect(resolved.base).toBe('/from-cli');
   });
+
+  it('resolves dependencies from config file', async () => {
+    writeFile(
+      tmpDir,
+      'fea-docs.config.mjs',
+      "export default { dependencies: { 'left-pad': '^1.0.0', 'react': '^19.0.0' } };\n",
+    );
+
+    const resolved = await resolveConfig({});
+    expect(resolved.dependencies).toEqual({ 'left-pad': '^1.0.0', 'react': '^19.0.0' });
+  });
+
+  it('defaults to empty dependencies when not specified', async () => {
+    writeFile(
+      tmpDir,
+      'fea-docs.config.mjs',
+      "export default { name: 'Test' };\n",
+    );
+
+    const resolved = await resolveConfig({});
+    expect(resolved.dependencies).toEqual({});
+  });
+
+  it('merges CLI dependencies over file config dependencies', async () => {
+    writeFile(
+      tmpDir,
+      'fea-docs.config.mjs',
+      "export default { dependencies: { 'left-pad': '^1.0.0', 'react': '^18.0.0' } };\n",
+    );
+
+    const resolved = await resolveConfig({ dependencies: { react: '^19.0.0' } } as unknown as Partial<ResolvedConfig>);
+    expect(resolved.dependencies).toEqual({ 'left-pad': '^1.0.0', 'react': '^19.0.0' });
+  });
 });
 
 describe('inferConfigFromDocs', () => {
@@ -106,5 +140,39 @@ describe('inferConfigFromDocs', () => {
     expect(inferred.config.frameworks).toContain('react');
     expect(inferred.config.aliases['@react-lib']).toBe('/tmp/react-lib');
     expect(inferred.sources).toHaveLength(1);
+  });
+
+  it('infers dependencies from nested fea-docs config', async () => {
+    writeFile(
+      tmpDir,
+      'example/fea-docs.config.mjs',
+      "export default { dependencies: { 'left-pad': '^1.0.0' } };\n",
+    );
+
+    const inferred = await inferConfigFromDocs(baseConfig(tmpDir), ['example/docs/integrations.mdx']);
+
+    expect(inferred.config.dependencies).toEqual({ 'left-pad': '^1.0.0' });
+  });
+
+  it('merges dependencies from ancestor configs with first-wins semantics', async () => {
+    writeFile(
+      tmpDir,
+      'fea-docs.config.mjs',
+      "export default { dependencies: { 'left-pad': '^1.0.0', 'react': '^18.0.0' } };\n",
+    );
+    writeFile(
+      tmpDir,
+      'example/fea-docs.config.mjs',
+      "export default { dependencies: { 'react': '^19.0.0', 'vue': '^3.0.0' } };\n",
+    );
+
+    const inferred = await inferConfigFromDocs(baseConfig(tmpDir), ['example/docs/integrations.mdx']);
+
+    // First-wins: 'react' from root config wins, 'vue' is new so added
+    expect(inferred.config.dependencies).toEqual({
+      'left-pad': '^1.0.0',
+      'react': '^18.0.0',
+      'vue': '^3.0.0',
+    });
   });
 });

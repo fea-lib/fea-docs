@@ -13,4 +13,7 @@ export default {
     '@astro-lib': path.join(exampleDir, 'astro-lib'),
     '@components': path.join(exampleDir, 'components')
   },
+  dependencies: {
+    '@codesandbox/sandpack-react': '^2.20.0',
+  },
 };

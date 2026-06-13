@@ -17,6 +17,7 @@ const baseConfig: ResolvedConfig = {
   slugOverrides: {},
   frameworks: [],
   aliases: {},
+  dependencies: {},
   tailscaleServe: false,
   caffeinate: false,
   expose: false,
@@ -59,5 +60,21 @@ describe('SessionCacheManager', () => {
     manager.save(config);
     manager.invalidate();
     expect(manager.isValid(config)).toBe(false);
+  });
+
+  it('same dependencies yield same fingerprint', () => {
+    const configA = { ...baseConfig, root: tmpDir, dependencies: { 'left-pad': '^1.0.0' } };
+    const configB = { ...baseConfig, root: tmpDir, dependencies: { 'left-pad': '^1.0.0' } };
+
+    manager.save(configA);
+    expect(manager.isValid(configB)).toBe(true);
+  });
+
+  it('different dependencies yield different fingerprint', () => {
+    const configA = { ...baseConfig, root: tmpDir, dependencies: { 'left-pad': '^1.0.0' } };
+    const configB = { ...baseConfig, root: tmpDir, dependencies: { 'right-pad': '^2.0.0' } };
+
+    manager.save(configA);
+    expect(manager.isValid(configB)).toBe(false);
   });
 });

@@ -24,6 +24,7 @@ const DEFAULT_CONFIG: ResolvedConfig = {
   strict: false,
   frameworks: [],
   aliases: {},
+  dependencies: {},
   tailscaleServe: false,
   caffeinate: false,
   expose: false,
@@ -73,6 +74,10 @@ export async function resolveConfig(
     aliases: {
       ...(fileConfig.aliases ?? {}),
       ...(cliFlags.aliases ?? {}),
+    },
+    dependencies: {
+      ...(fileConfig.dependencies ?? {}),
+      ...(cliFlags.dependencies ?? {}),
     },
     base: normalizeBasePath(cliFlags.base ?? envConfig.base ?? fileConfig.base ?? DEFAULT_CONFIG.base),
   };
@@ -132,6 +137,7 @@ export async function inferConfigFromDocs(
 
   const inferredFrameworks = [...config.frameworks];
   const inferredAliases = { ...config.aliases };
+  const inferredDependencies = { ...config.dependencies };
   const sources = Array.from(discoveredConfigs).sort((a, b) => a.length - b.length);
 
   for (const source of sources) {
@@ -150,6 +156,12 @@ export async function inferConfigFromDocs(
         inferredAliases[aliasKey] = aliasPath;
       }
     }
+
+    for (const [depKey, depVersion] of Object.entries(fromFile.dependencies ?? {})) {
+      if (!(depKey in inferredDependencies)) {
+        inferredDependencies[depKey] = depVersion;
+      }
+    }
   }
 
   return {
@@ -157,6 +169,7 @@ export async function inferConfigFromDocs(
       ...config,
       frameworks: inferredFrameworks,
       aliases: inferredAliases,
+      dependencies: inferredDependencies,
     },
     sources,
   };

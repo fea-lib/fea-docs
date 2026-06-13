@@ -22,6 +22,7 @@ function makeConfig(root: string): ResolvedConfig {
     strict: false,
     frameworks: [],
     aliases: {},
+    dependencies: {},
     tailscaleServe: false,
     caffeinate: false,
     expose: false,
@@ -45,7 +46,7 @@ function makeGraph(root: string, pages: Array<{ rel: string; label: string; entr
 
 async function invokePrivate(
   adapter: RuntimeAdapter,
-  method: 'writeContentConfig' | 'writeContentLinks' | 'writeAstroConfig' | 'writeRemarkPlugin',
+  method: 'writePackageJson' | 'writeContentConfig' | 'writeContentLinks' | 'writeAstroConfig' | 'writeRemarkPlugin',
 ): Promise<void> {
   await (adapter as unknown as Record<string, () => Promise<void>>)[method]();
 }
@@ -241,5 +242,45 @@ describe('RuntimeAdapter content loader config', () => {
 
     const astroConfig = fs.readFileSync(path.join(adapter.projectDir, 'astro.config.mjs'), 'utf-8');
     expect(astroConfig).toContain("title: \"Math Tools\"");
+  });
+
+  it('writePackageJson includes user dependencies', async () => {
+    const root = path.join(tmpDir, 'test-docs');
+    fs.mkdirSync(root, { recursive: true });
+
+    const graph = makeGraph(root, [
+      { rel: 'guide/intro.md', label: 'Intro', entryId: 'guide/intro' },
+    ]);
+
+    const adapter = new RuntimeAdapter({
+      config: { ...makeConfig(root), dependencies: { 'left-pad': '^1.0.0' } },
+      graph,
+    });
+
+    fs.mkdirSync(adapter.projectDir, { recursive: true });
+    await invokePrivate(adapter, 'writePackageJson');
+
+    const pkg = JSON.parse(fs.readFileSync(path.join(adapter.projectDir, 'package.json'), 'utf-8'));
+    expect(pkg.dependencies['left-pad']).toBe('^1.0.0');
+  });
+
+  it('writePackageJson user deps override framework deps on name collision', async () => {
+    const root = path.join(tmpDir, 'test-docs');
+    fs.mkdirSync(root, { recursive: true });
+
+    const graph = makeGraph(root, [
+      { rel: 'guide/intro.md', label: 'Intro', entryId: 'guide/intro' },
+    ]);
+
+    const adapter = new RuntimeAdapter({
+      config: { ...makeConfig(root), frameworks: ['react'], dependencies: { react: '^99.0.0' } },
+      graph,
+    });
+
+    fs.mkdirSync(adapter.projectDir, { recursive: true });
+    await invokePrivate(adapter, 'writePackageJson');
+
+    const pkg = JSON.parse(fs.readFileSync(path.join(adapter.projectDir, 'package.json'), 'utf-8'));
+    expect(pkg.dependencies['react']).toBe('^99.0.0');
   });
 });

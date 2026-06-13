@@ -78,6 +78,7 @@ export class RuntimeAdapter {
         'unist-util-visit': '^5.1.0',
         'mdast-util-to-string': '^4.0.0',
         ...this.frameworkDeps(),
+        ...this.options.config.dependencies,
       },
     };
     fs.writeFileSync(

@@ -34,6 +34,7 @@ export class SessionCacheManager {
       ignore: config.ignore,
       frameworks: config.frameworks,
       aliases: config.aliases,
+      dependencies: config.dependencies,
       pages: [...pages].sort(),
     });
     return crypto.createHash('sha256').update(sig).digest('hex');

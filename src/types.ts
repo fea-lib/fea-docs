@@ -60,6 +60,8 @@ export interface FeaDocsConfig {
   frameworks?: FrameworkAdapter[];
   /** Alias import roots for component imports. */
   aliases?: Record<string, string>;
+  /** Additional npm dependencies for custom MDX components. */
+  dependencies?: Record<string, string>;
   /** Tailscale serve integration. */
   tailscaleServe?: boolean;
   /** Caffeinate (macOS sleep prevention). */
@@ -80,6 +82,7 @@ export interface ResolvedConfig {
   strict: boolean;
   frameworks: FrameworkAdapter[];
   aliases: Record<string, string>;
+  dependencies: Record<string, string>;
   tailscaleServe: boolean;
   caffeinate: boolean;
   expose: boolean;
