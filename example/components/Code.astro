@@ -1,0 +1,41 @@
+---
+import React_Code, { type Props as React_Props } from "@components/react/Code";
+import type { SANDBOX_TEMPLATES } from "@codesandbox/sandpack-react";
+import type { FileResource } from "./types/FileResource";
+import { loadFileResource } from "./utils/loadFileResource";
+
+type AppType = keyof typeof SANDBOX_TEMPLATES;
+
+type FileResources = {
+  [key: string]: FileResource;
+};
+
+type AppTemplate = {
+  [K in AppType]: {
+    [key in K]: {
+      [F in keyof (typeof SANDBOX_TEMPLATES)[K]["files"]]?: FileResource;
+    } & FileResources;
+  };
+}[AppType];
+
+type Props = Omit<React_Props, "src"> & { src: AppTemplate };
+
+const { src, ...props } = Astro.props as Props;
+
+const appType = Object.keys(src)[0] as AppType;
+const fileResources = (src as Record<AppType, FileResources>)[appType];
+
+const entries = Object.entries(fileResources);
+const loaded = await Promise.all(
+  entries.map(async ([filename, resource]) => [
+    filename,
+    await loadFileResource(resource),
+  ])
+);
+
+const srcWithContents = {
+  [appType]: Object.fromEntries(loaded),
+} as React_Props["src"];
+---
+
+<React_Code client:only="react" {...props} src={srcWithContents} />

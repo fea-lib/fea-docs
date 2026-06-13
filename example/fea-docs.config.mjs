@@ -11,5 +11,6 @@ export default {
     '@react-lib': path.join(exampleDir, 'react-lib'),
     '@svelte-lib': path.join(exampleDir, 'svelte-lib'),
     '@astro-lib': path.join(exampleDir, 'astro-lib'),
+    '@components': path.join(exampleDir, 'components')
   },
 };

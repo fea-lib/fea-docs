@@ -1,0 +1,104 @@
+---
+title: "Amelcraft: A Kid-Friendly 2D Minecraft-Inspired Game"
+---
+
+import Code from "@components/Code.astro";
+
+<div style="border-radius: 6px; background-color: var(--border-color); padding: 1rem; font-size: 1.5rem;">
+  <span>Continued at <a href="https://github.com/amelie-game/bd-25" style="font-weight:600">amelie-game/bd-25</a></span>
+</div>
+
+## Project Evolution
+The project began as a birthday idea for a 7-year-old, inspired by the Minecraft hype but aiming for simplicity and accessibility. The concept evolved from a general 2D block-building game to a focused, responsive, cross-device experience using Phaser.js. Early discussions weighed complexity (e.g., day/night cycles, pathfinding) against the need for a fun, easy-to-play game. The design journey included debates about control schemes, building mechanics, and the choice between 2D and simulated 3D, ultimately favoring a top-down, grid-based approach for ease of use and development.
+
+## Project Genesis & Motivation
+The motivation was personal: to create a custom game for a child's birthday, capturing the excitement of Minecraft in a form approachable for a young beginner. The project was inspired by the child's fascination with Minecraft and the desire to provide a creative, interactive experience tailored to her age and skills. The goal was to foster creativity, exploration, and fun, while keeping technical and gameplay complexity low.
+
+## Project Overview
+Amelcraft is a simple, 2D, tile-based game where players can harvest materials and place blocks in a world reminiscent of Minecraft. Designed for both desktop and mobile, it features responsive controls and adaptive camera zoom, ensuring a smooth experience across devices. The game is intended for young children, with intuitive drag-to-move controls and straightforward block placement.
+
+## Core Ideas & Features
+- **2D Tile-Based World:** The game world is a grid of 48x48px tiles.
+- **Harvesting & Placing Blocks:** Players collect materials and place blocks on the grid.
+- **Drag-to-Move Controls:** Movement is controlled by dragging on the screen (touch or mouse).
+- **Responsive Design:** The game adapts to device size and orientation, with dynamic camera zoom.
+- **Simple Inventory:** Materials collected are stored and can be selected for placement.
+- **Single-File POC:** Initial proof-of-concept provided as a single HTML file for easy testing.
+
+## Design Decisions & Rationale
+- **Phaser.js Chosen:** For rapid development and cross-platform support.
+- **Drag-to-Move Over Click-to-Move:** Simpler for young children, avoids pathfinding complexity.
+- **Top-Down (Horizontal) Building:** More intuitive for kids, easier to implement than vertical or 3D.
+- **Responsive Canvas & Camera Zoom:** Ensures playability on all devices, keeps sprites visible and detailed.
+- **No Day/Night Cycle:** Dropped for simplicity.
+- **Block Placement Logic:** Grid-based, with pointer-to-tile conversion for intuitive interaction.
+
+## Rejected Ideas & Alternatives
+- **Day/Night Cycle:** Rejected to keep the game simple.
+- **Click-to-Move with Pathfinding:** Considered but dropped due to complexity.
+- **3D or Isometric Building:** Rejected for technical and cognitive simplicity; 2D chosen.
+- **Vertical (Wall) Building:** Considered, but horizontal (ground) building selected for accessibility.
+
+## Player vs. Team Focus Debate
+The game is designed as a single-player experience, focused on individual creativity and exploration. Team or multiplayer features were not prioritized, given the target audience and scope.
+
+## Personal/Inspirational Details
+The project was inspired by a child's birthday and her fascination with Minecraft. The design choices reflect a desire to create a fun, approachable experience tailored to her interests and abilities.
+
+## Key Conversation Excerpts
+> "For my daughter's 7th birthday I want to make her a little video game, using phaser.js...simple 2D, sprite and tilemap based game, in which she can harvest a few materials and then place blocks from these materials in the world."
+
+> "I want the game to run on a desktop, as well as a mobile phone...controllable by touch/mouse click and the game screen and camera zoom level should adapt itself to the device."
+
+> "For simplicity and a smooth experience for a 7-year-old, Option 2 (drag-to-move) is best. It's easy to implement in Phaser, and kids enjoy direct control."
+
+> "For a Minecraft-like experience and simplicity for a child, the horizontal plane (top-down) is best. It's intuitive, easy to control, and lets your daughter 'walk' over her creations."
+
+## Architecture & Structure
+- **Phaser.js Engine:** Handles rendering, input, and game logic.
+- **Responsive Canvas:** Uses Phaser's scale manager for device adaptation.
+- **Camera Zoom Logic:** Dynamically calculates zoom based on screen size and tile size.
+- **Player Sprite:** Controlled via drag-to-move pointer events.
+- **Tile Grid:** 2D array represents the world; block placement updates the grid and renders sprites.
+- **Inventory System:** Simple array for collected materials and block selection.
+
+## Code Snippets & Examples
+
+### Responsive Game Screen
+
+<Code
+  src={{ "vanilla" : {
+    'index.html': new URL("file:///docs/games/pocs/responsive-game-screen/index.html"),
+    'index.js': new URL("file:////docs/games/pocs/responsive-game-screen/index.js")
+  }}}
+/>
+
+### Drag to Move
+
+<Code
+  src={{ "vanilla" : {
+    'index.html': new URL("file:////docs/games/pocs/drag-to-move/index.html"),
+    'index.js': new URL("file:////docs/games/pocs/drag-to-move/index.js")
+  }}}
+/>
+
+### Block Placement
+
+<Code
+  src={{ "vanilla" : {
+    'index.html': new URL("file:////docs/games/pocs/block-placement/index.html"),
+    'index.js': new URL("file:////docs/games/pocs/block-placement/index.js")
+  }}}
+/>
+
+## References & Inspirations
+- [Phaser.js Documentation](https://phaser.io/)
+- Minecraft (as inspiration for block-building mechanics)
+- Stardew Valley, Zelda (for top-down design ideas)
+
+## Open Questions & Next Steps
+- Expand inventory and block types.
+- Add harvesting mechanics and sound effects.
+- Design custom sprites and tiles.
+- Consider simple NPCs or animals for added fun.
+- Polish UI for block selection and inventory management.
