@@ -29,7 +29,6 @@ export default function Code({ src, ...options }: Props) {
 
   return (
     <Sandpack
-      theme={theme}
       files={files}
       options={options}
     />

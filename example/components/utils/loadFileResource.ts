@@ -8,6 +8,28 @@ import type {
   FileResource,
 } from "../types/FileResource";
 
+function findProjectRoot(startDir: string): string | null {
+  const symlinkPath = path.join(startDir, "src", "content", "docs");
+  try {
+    if (fs.lstatSync(symlinkPath).isSymbolicLink()) {
+      const target = fs.readlinkSync(symlinkPath);
+      return path.isAbsolute(target)
+        ? target
+        : path.resolve(path.dirname(symlinkPath), target);
+    }
+  } catch {}
+
+  let current = startDir;
+  while (true) {
+    if (fs.existsSync(path.join(current, "fea-docs.config.mjs"))) {
+      return current;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
+}
+
 function resolveExistingPath(pathname: string): string {
   if (path.isAbsolute(pathname) && fs.existsSync(pathname)) {
     return pathname;
@@ -15,15 +37,6 @@ function resolveExistingPath(pathname: string): string {
 
   const rawPath = pathname.startsWith("/") ? pathname.slice(1) : pathname;
   const relVariants = new Set<string>([rawPath]);
-
-  if (rawPath.startsWith("docs/")) {
-    relVariants.add(rawPath.slice("".length));
-    relVariants.add(rawPath.slice("docs/".length));
-  }
-
-  if (rawPath.startsWith("")) {
-    relVariants.add(rawPath.slice("".length));
-  }
 
   if (rawPath.startsWith("docs/")) {
     relVariants.add(rawPath.slice("docs/".length));
@@ -37,6 +50,12 @@ function resolveExistingPath(pathname: string): string {
     path.resolve(cwd, "../.."),
     path.resolve(cwd, "../../.."),
   ];
+
+  const projectRoot = findProjectRoot(cwd);
+  if (projectRoot) {
+    candidateBases.push(projectRoot);
+    candidateBases.push(path.resolve(projectRoot, "docs"));
+  }
 
   for (const base of candidateBases) {
     for (const relPath of relVariants) {
