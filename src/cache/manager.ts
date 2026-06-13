@@ -4,6 +4,10 @@ import crypto from 'node:crypto';
 import type { ResolvedConfig } from '../types.js';
 import { feaDocsWorkspaceCacheDir } from '../utils/cache-dir.js';
 
+// Bump when hardcoded dependency ranges in RuntimeAdapter change
+// so that cached fingerprints invalidate and trigger a fresh install.
+const CACHE_VERSION = '1';
+
 export interface CacheEntry {
   fingerprint: string;
   createdAt: number;
@@ -24,6 +28,7 @@ export class SessionCacheManager {
 
   private fingerprint(config: ResolvedConfig, pages: string[] = []): string {
     const sig = JSON.stringify({
+      cacheVersion: CACHE_VERSION,
       root: config.root,
       base: config.base,
       ignore: config.ignore,

@@ -91,7 +91,7 @@ export function startCommand(): Command {
         // Materialize Starlight app
         const adapter = new RuntimeAdapter({ config, graph });
         console.log(pc.cyan(cacheHit ? 'Refreshing Starlight runtime...' : 'Preparing Starlight runtime...'));
-        await adapter.materialize();
+        await adapter.materialize({ fresh: !cacheHit });
         console.log(pc.cyan(`Runtime cache dir: ${adapter.runtimeDir}`));
         cache.save(config, pageRelPaths);
 

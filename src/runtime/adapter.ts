@@ -45,7 +45,7 @@ export class RuntimeAdapter {
   }
 
   /** Ensure the ephemeral project exists and is up to date. */
-  async materialize(): Promise<void> {
+  async materialize(options?: { fresh?: boolean }): Promise<void> {
     fs.mkdirSync(this.projectDir, { recursive: true });
     await this.writePackageJson();
     await this.writeRemarkPlugin();
@@ -53,14 +53,14 @@ export class RuntimeAdapter {
     await this.writeAstroConfig();
     await this.writeContentLinks();
     await this.writeContentConfig();
-    await this.installDeps();
+    await this.installDeps({ clean: options?.fresh ?? true });
   }
 
   /** Ensure framework/runtime dependencies are installed for the current config. */
   async ensureDependencies(): Promise<void> {
     fs.mkdirSync(this.projectDir, { recursive: true });
     await this.writePackageJson();
-    await this.installDeps();
+    await this.installDeps({ clean: true });
   }
 
   private async writePackageJson(): Promise<void> {
@@ -409,8 +409,20 @@ export const collections = {
     fs.writeFileSync(path.join(this.projectDir, 'src', 'content.config.ts'), config);
   }
 
-  private async installDeps(): Promise<void> {
-    execSync('npm install --prefer-offline --loglevel=warn', {
+  private async installDeps(options?: { clean?: boolean }): Promise<void> {
+    const modulesDir = path.join(this.projectDir, 'node_modules');
+
+    if (!options?.clean && fs.existsSync(modulesDir)) {
+      return; // cache hit — node_modules is already valid
+    }
+
+    if (options?.clean) {
+      const lockFile = path.join(this.projectDir, 'package-lock.json');
+      if (fs.existsSync(lockFile)) fs.rmSync(lockFile);
+      if (fs.existsSync(modulesDir)) fs.rmSync(modulesDir, { recursive: true });
+    }
+
+    execSync('npm install --loglevel=warn', {
       cwd: this.projectDir,
       stdio: 'pipe',
     });
