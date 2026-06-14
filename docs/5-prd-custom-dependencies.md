@@ -1,5 +1,5 @@
 ---
-title: "PRD: User-Configurable Dependencies (v1.0)"
+title: "2.2: User-Configurable Dependencies"
 ---
 
 ## Context

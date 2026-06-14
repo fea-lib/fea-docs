@@ -1,5 +1,5 @@
 ---
-title: "Implementation Plan: Base Path Support"
+title: "2.1: Base Path Support"
 ---
 
 ## Requirements

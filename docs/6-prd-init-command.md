@@ -1,5 +1,5 @@
 ---
-title: "PRD: fea-docs init — Config Scaffold Command (v1.0)"
+title: "2.2: init — Config Scaffold Command"
 ---
 
 ## Context

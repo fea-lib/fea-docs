@@ -1,5 +1,5 @@
 ---
-title: "PRD: MDX Framework Inference (v1.2)"
+title: "1.2: MDX Framework Inference"
 ---
 
 ## Context

@@ -389,8 +389,10 @@ export default function remarkStripLeadH1() {
    * All source files are guaranteed to have a title by the time this runs
    * because parseDocFile injects one if missing during the scan phase.
    */
-  private async writeContentConfig(): Promise<void> {
-    const pattern = JSON.stringify(CONTENT_GLOB_PATTERNS, null, 6).replace(/\n/g, '\n      ');
+  private async writeContentConfig(pages?: DocPage[]): Promise<void> {
+    const pattern = pages && pages.length > 0
+      ? JSON.stringify(pages.map((p) => p.relativePath.replace(/\\/g, '/')), null, 6).replace(/\n/g, '\n      ')
+      : JSON.stringify(CONTENT_GLOB_PATTERNS, null, 6).replace(/\n/g, '\n      ');
     const config = `\
 import { defineCollection } from 'astro:content';
 import { glob } from 'astro/loaders';
@@ -449,8 +451,8 @@ export const collections = {
       await this.writeRemarkPlugin();
       await this.writeStripLeadH1Plugin();
       await this.writeAstroConfig();
-      this.writeFilteredContentLinks(pages);
-      await this.writeContentConfig();
+      this.writeFilteredContentLinks();
+      await this.writeContentConfig(pages);
       await this.installDeps({ clean: true });
 
       const buildOutDir = path.join(this.projectDir, 'dist');
@@ -461,65 +463,17 @@ export const collections = {
     }
   }
 
-  /** Symlink the full root, then remove unmatched doc files so the content
-   *  layer only sees the filtered set. Asset files remain available via
-   *  the symlink tree, so docs can reference local images, PDFs, etc. */
-  private writeFilteredContentLinks(pages: DocPage[]): void {
+  /** Symlink the full root so asset files remain available via
+   *  the symlink tree. The content config handles which docs are loaded. */
+  private writeFilteredContentLinks(): void {
     const contentParent = path.join(this.projectDir, 'src', 'content');
     const contentDir = path.join(contentParent, 'docs');
 
-    // Symlink the full root so non-doc assets are accessible
     fs.rmSync(contentDir, { recursive: true, force: true });
     fs.mkdirSync(contentParent, { recursive: true });
     fs.symlinkSync(this.options.config.root, contentDir, 'dir');
 
-    // Remove unmatched doc files from the symlink tree
-    const matchedPaths = new Set(pages.map((p) => p.relativePath.replace(/\\/g, '/')));
-    this.pruneUnmatchedFiles(contentDir, matchedPaths, '');
-
     this.writeIndexRedirect();
-  }
-
-  /** Walk a directory tree and remove unmatched .md/.mdx symlink leaves. */
-  private pruneUnmatchedFiles(
-    dir: string,
-    matchedPaths: Set<string>,
-    prefix: string,
-  ): void {
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-
-    for (const entry of entries) {
-      const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
-      const fullPath = path.join(dir, entry.name);
-
-      if (entry.isDirectory()) {
-        this.pruneUnmatchedFiles(fullPath, matchedPaths, relative);
-        // Remove empty directories left after pruning
-        try {
-          if (fs.readdirSync(fullPath).length === 0) {
-            fs.rmdirSync(fullPath);
-          }
-        } catch {
-          // ignore
-        }
-      } else if (
-        entry.isFile() &&
-        (entry.name.endsWith('.md') || entry.name.endsWith('.mdx'))
-      ) {
-        if (!matchedPaths.has(relative)) {
-          try {
-            fs.unlinkSync(fullPath);
-          } catch {
-            // ignore
-          }
-        }
-      }
-    }
   }
 
   /** Start the Astro dev server. Returns the port it started on. */

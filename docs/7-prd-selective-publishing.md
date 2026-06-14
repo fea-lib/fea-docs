@@ -1,5 +1,5 @@
 ---
-title: "PRD: Selective Publishing (v1.0)"
+title: "2.3: Selective Publishing"
 ---
 
 ## Context
