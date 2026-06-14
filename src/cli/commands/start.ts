@@ -23,7 +23,7 @@ export function startCommand(): Command {
       'Additional ignore globs',
     )
     .option('--framework <name...>', 'Enable framework adapters (react, vue, svelte, solid, qwik)')
-    .option('--tailscale-serve', 'Enable Tailscale serve integration')
+    .option('--tailscale-serve, --tailscale', 'Enable Tailscale serve integration')
     .option('--caffeinate', 'Prevent macOS sleep during session')
     .option('--expose', 'Explicitly consent to remote exposure')
     .action(async (opts) => {
