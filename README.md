@@ -19,7 +19,6 @@ Run `npx fea-docs@latest start` from any directory and get a live Starlight-powe
 - **Framework adapters** — opt-in React, Vue, Svelte, and Solid integrations
 - **Strict CI mode** — fails on broken links, duplicate slugs, missing labels, and frontmatter errors
 - **Static build** — `fea-docs build` emits deployable output with copied assets
-- **GitHub Pages bootstrap** — `fea-docs setup gh-pages` generates a workflow file and setup instructions
 - **Session cache** — repeated runs reuse the Starlight runtime; only reinstalls on config change
 - **No telemetry** — fully local and private
 
@@ -39,15 +38,6 @@ npx fea-docs@latest start --base /my-repo
 
 # Build static output for deployment
 npx fea-docs@latest build --out-dir ./dist
-
-# Build static output for GitHub Pages project site
-npx fea-docs@latest build --out-dir ./dist --base /my-repo
-
-# Bootstrap GitHub Pages deployment
-npx fea-docs@latest setup gh-pages
-
-# Bootstrap GitHub Pages deployment with base path
-npx fea-docs@latest setup gh-pages --base /my-repo
 
 # Enable strict validation (default in build mode)
 npx fea-docs@latest start --strict
@@ -184,7 +174,6 @@ src/
   strict/                    CI validation rules
   runtime/                   Ephemeral Starlight app lifecycle
   build/                     Static asset export
-  gh-pages/                  GitHub Pages workflow generator
   cache/                     Session fingerprint cache
   cli/commands/              start, build, setup subcommands
 ```

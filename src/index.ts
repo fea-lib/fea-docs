@@ -3,7 +3,6 @@ export { LinkAssetResolver } from './link-asset/resolver.js';
 export { StrictValidator } from './strict/validator.js';
 export { RuntimeAdapter } from './runtime/adapter.js';
 export { BuildExporter } from './build/exporter.js';
-export { GithubPagesBootstrapper } from './gh-pages/bootstrapper.js';
 export { SessionCacheManager } from './cache/manager.js';
 export { inferFrameworksFromMdxGraph } from './mdx-framework/inferer.js';
 export type {
