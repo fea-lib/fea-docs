@@ -156,7 +156,6 @@ ${frameworkImports}
 
 export default defineConfig({
   base: ${JSON.stringify(config.base)},
-  publicDir: ${JSON.stringify(config.root)},
   integrations: [
     starlight({
       title: ${JSON.stringify(title)},
@@ -462,21 +461,65 @@ export const collections = {
     }
   }
 
-  /** Write symlinks only for the specified pages instead of the full root. */
+  /** Symlink the full root, then remove unmatched doc files so the content
+   *  layer only sees the filtered set. Asset files remain available via
+   *  the symlink tree, so docs can reference local images, PDFs, etc. */
   private writeFilteredContentLinks(pages: DocPage[]): void {
     const contentParent = path.join(this.projectDir, 'src', 'content');
     const contentDir = path.join(contentParent, 'docs');
 
+    // Symlink the full root so non-doc assets are accessible
     fs.rmSync(contentDir, { recursive: true, force: true });
-    fs.mkdirSync(contentDir, { recursive: true });
+    fs.mkdirSync(contentParent, { recursive: true });
+    fs.symlinkSync(this.options.config.root, contentDir, 'dir');
 
-    for (const page of pages) {
-      const targetPath = path.join(contentDir, page.relativePath);
-      fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-      fs.symlinkSync(page.absolutePath, targetPath, 'file');
-    }
+    // Remove unmatched doc files from the symlink tree
+    const matchedPaths = new Set(pages.map((p) => p.relativePath.replace(/\\/g, '/')));
+    this.pruneUnmatchedFiles(contentDir, matchedPaths, '');
 
     this.writeIndexRedirect();
+  }
+
+  /** Walk a directory tree and remove unmatched .md/.mdx symlink leaves. */
+  private pruneUnmatchedFiles(
+    dir: string,
+    matchedPaths: Set<string>,
+    prefix: string,
+  ): void {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const fullPath = path.join(dir, entry.name);
+
+      if (entry.isDirectory()) {
+        this.pruneUnmatchedFiles(fullPath, matchedPaths, relative);
+        // Remove empty directories left after pruning
+        try {
+          if (fs.readdirSync(fullPath).length === 0) {
+            fs.rmdirSync(fullPath);
+          }
+        } catch {
+          // ignore
+        }
+      } else if (
+        entry.isFile() &&
+        (entry.name.endsWith('.md') || entry.name.endsWith('.mdx'))
+      ) {
+        if (!matchedPaths.has(relative)) {
+          try {
+            fs.unlinkSync(fullPath);
+          } catch {
+            // ignore
+          }
+        }
+      }
+    }
   }
 
   /** Start the Astro dev server. Returns the port it started on. */

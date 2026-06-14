@@ -136,7 +136,6 @@ describe('RuntimeAdapter content loader config', () => {
     const astroConfig = fs.readFileSync(path.join(adapter.projectDir, 'astro.config.mjs'), 'utf-8');
 
     expect(astroConfig).toContain("base: \"/\"");
-    expect(astroConfig).toContain(`publicDir: ${JSON.stringify(tmpDir)}`);
     expect(astroConfig).toContain("sidebar: [");
     expect(astroConfig).toContain("{ autogenerate: { directory: 'docs' } }");
     expect(astroConfig).not.toContain('nav-entry-not-found');

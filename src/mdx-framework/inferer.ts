@@ -56,7 +56,8 @@ function extractImports(source: string): string[] {
 }
 
 function resolveAliasImport(specifier: string, aliases: Record<string, string>): string | null {
-  for (const [alias, target] of Object.entries(aliases)) {
+  const sorted = Object.entries(aliases).sort(([a], [b]) => b.length - a.length);
+  for (const [alias, target] of sorted) {
     if (specifier === alias) return target;
     if (specifier.startsWith(`${alias}/`)) {
       return path.join(target, specifier.slice(alias.length + 1));
