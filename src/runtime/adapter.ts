@@ -365,12 +365,13 @@ export default function remarkStripLeadH1() {
     this.writeIndexRedirect();
   }
 
-  private writeIndexRedirect(): void {
+  private writeIndexRedirect(pagesOverride?: DocPage[]): void {
+    const pages = pagesOverride ?? this.options.graph.pages;
     // Prefer a top-level section index (README) as the landing page; fall back
-    // to the first page in the graph.
+    // to the first page in the set.
     const landingPage =
-      this.options.graph.pages.find((p) => p.isSectionIndex && !p.relativePath.includes('/')) ??
-      this.options.graph.pages[0];
+      pages.find((p) => p.isSectionIndex && !p.relativePath.includes('/')) ??
+      pages[0];
     if (!landingPage) return;
     const target = joinBasePath(this.options.config.base, `/${landingPage.entryId}/`);
     const pagesDir = path.join(this.projectDir, 'src', 'pages');
@@ -482,7 +483,7 @@ export const collections = {
     fs.mkdirSync(contentParent, { recursive: true });
     fs.symlinkSync(this.options.config.root, contentDir, 'dir');
 
-    this.writeIndexRedirect();
+    this.writeIndexRedirect(pages);
   }
 
   /** Start the Astro dev server. Returns the port it started on. */
