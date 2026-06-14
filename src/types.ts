@@ -68,6 +68,8 @@ export interface FeaDocsConfig {
   caffeinate?: boolean;
   /** Explicit remote expose consent. */
   expose?: boolean;
+  /** Named publish targets. */
+  publish?: Record<string, PublishTarget>;
 }
 
 /** Resolved, merged runtime config (all fields present). */
@@ -86,6 +88,7 @@ export interface ResolvedConfig {
   tailscaleServe: boolean;
   caffeinate: boolean;
   expose: boolean;
+  publish?: Record<string, ResolvedPublishTarget>;
 }
 
 /** Diagnostic emitted during validation. */
@@ -95,4 +98,26 @@ export interface Diagnostic {
   message: string;
   file?: string;
   line?: number;
+}
+
+export interface GitTargetConfig {
+  repo: string;
+  branch: string;
+  targetDir: string;
+}
+
+export interface FileTargetConfig {
+  targetDir: string;
+}
+
+export type PublishTargetType = 'git' | 'file';
+
+export interface PublishTarget {
+  type: PublishTargetType;
+  sourcesTargetDir?: string;
+  config: GitTargetConfig | FileTargetConfig;
+}
+
+export interface ResolvedPublishTarget extends PublishTarget {
+  name: string;
 }

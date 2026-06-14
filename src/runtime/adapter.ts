@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync, spawn, type ChildProcess } from 'node:child_process';
-import type { DocsGraph, ResolvedConfig } from '../types.js';
+import type { DocPage, DocsGraph, ResolvedConfig } from '../types.js';
 import { feaDocsWorkspaceCacheDir } from '../utils/cache-dir.js';
 import { joinBasePath } from '../utils/base-path.js';
 
@@ -427,6 +427,56 @@ export const collections = {
       cwd: this.projectDir,
       stdio: 'pipe',
     });
+  }
+
+  /**
+   * Create a filtered Astro project in an ephemeral directory with only
+   * the specified pages available, then run a build.
+   * The shared cache (runtimeDir) is never modified.
+   * Returns the build output directory path.
+   */
+  async createFilteredBuild(
+    pages: DocPage[],
+    targetDir: string,
+    config: ResolvedConfig,
+  ): Promise<string> {
+    const savedWorkdir = this.workdir;
+
+    try {
+      this.workdir = targetDir;
+      fs.mkdirSync(this.projectDir, { recursive: true });
+
+      await this.writePackageJson();
+      await this.writeRemarkPlugin();
+      await this.writeStripLeadH1Plugin();
+      await this.writeAstroConfig();
+      this.writeFilteredContentLinks(pages);
+      await this.writeContentConfig();
+      await this.installDeps({ clean: true });
+
+      const buildOutDir = path.join(this.projectDir, 'dist');
+      await this.runBuild(buildOutDir);
+      return buildOutDir;
+    } finally {
+      this.workdir = savedWorkdir;
+    }
+  }
+
+  /** Write symlinks only for the specified pages instead of the full root. */
+  private writeFilteredContentLinks(pages: DocPage[]): void {
+    const contentParent = path.join(this.projectDir, 'src', 'content');
+    const contentDir = path.join(contentParent, 'docs');
+
+    fs.rmSync(contentDir, { recursive: true, force: true });
+    fs.mkdirSync(contentDir, { recursive: true });
+
+    for (const page of pages) {
+      const targetPath = path.join(contentDir, page.relativePath);
+      fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+      fs.symlinkSync(page.absolutePath, targetPath, 'file');
+    }
+
+    this.writeIndexRedirect();
   }
 
   /** Start the Astro dev server. Returns the port it started on. */

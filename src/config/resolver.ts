@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { ResolvedConfig } from '../types.js';
+import type { ResolvedConfig, ResolvedPublishTarget, PublishTarget } from '../types.js';
 import { normalizeBasePath } from '../utils/base-path.js';
 
 const CONFIG_CANDIDATES = [
@@ -42,11 +42,13 @@ export async function resolveConfig(
 
   const configPath = configFilePath ?? findConfigInCwd();
 
+  let rawPublish: Record<string, PublishTarget> | undefined;
   if (configPath) {
     if (!fs.existsSync(configPath)) {
       throw new Error(`Config file not found: ${configPath}`);
     }
     const raw = await import(path.resolve(configPath));
+    rawPublish = (raw.default ?? raw).publish as Record<string, PublishTarget> | undefined;
     fileConfig = raw.default ?? raw;
   }
 
@@ -55,6 +57,32 @@ export async function resolveConfig(
   const envConfig: Partial<ResolvedConfig> = {
     ...(envPort ? { port: Number(envPort) } : {}),
   };
+
+  // Resolve publish targets
+  const resolvedPublish: Record<string, ResolvedPublishTarget> = {};
+  if (rawPublish) {
+    for (const [name, target] of Object.entries(rawPublish)) {
+      if (!target.type || !['git', 'file'].includes(target.type)) {
+        console.warn(`  Publish target "${name}": unknown type "${target.type}", skipping`);
+        continue;
+      }
+      if (target.type === 'git') {
+        const gitCfg = target.config as { repo?: string; branch?: string; targetDir?: string };
+        if (!gitCfg.repo || !gitCfg.branch || gitCfg.targetDir === undefined) {
+          console.warn(`  Publish target "${name}": missing required git fields (repo, branch, targetDir), skipping`);
+          continue;
+        }
+      }
+      if (target.type === 'file') {
+        const fileCfg = target.config as { targetDir?: string };
+        if (fileCfg.targetDir === undefined) {
+          console.warn(`  Publish target "${name}": missing required file field (targetDir), skipping`);
+          continue;
+        }
+      }
+      resolvedPublish[name] = { name, ...target };
+    }
+  }
 
   return {
     ...DEFAULT_CONFIG,
@@ -80,6 +108,7 @@ export async function resolveConfig(
       ...(cliFlags.dependencies ?? {}),
     },
     base: normalizeBasePath(cliFlags.base ?? envConfig.base ?? fileConfig.base ?? DEFAULT_CONFIG.base),
+    ...(Object.keys(resolvedPublish).length > 0 ? { publish: resolvedPublish } : {}),
   };
 }
 
