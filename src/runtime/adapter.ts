@@ -170,7 +170,6 @@ export default defineConfig({
   },
   vite: {
     resolve: {
-      preserveSymlinks: true,
       ${aliasEntries ? `alias: {\n        ${aliasEntries}\n      },` : ''}
     },
     server: {
@@ -444,18 +443,28 @@ export const collections = {
     const savedWorkdir = this.workdir;
 
     try {
-      this.workdir = targetDir;
-      fs.mkdirSync(this.projectDir, { recursive: true });
+      // Use the cache dir for the ephemeral project so Astro's compilation
+      // cache behaves identically to the normal build. The targetDir is
+      // only used for the output.
+      this.workdir = feaDocsWorkspaceCacheDir(config.root);
+      const buildOutDir = path.join(targetDir, 'dist');
+      fs.mkdirSync(targetDir, { recursive: true });
+
+      // Always clean the app dir to remove stale filtered content
+      const appDir = this.projectDir;
+      if (fs.existsSync(appDir)) {
+        fs.rmSync(appDir, { recursive: true, force: true });
+      }
+      fs.mkdirSync(appDir, { recursive: true });
 
       await this.writePackageJson();
       await this.writeRemarkPlugin();
       await this.writeStripLeadH1Plugin();
       await this.writeAstroConfig();
-      this.writeFilteredContentLinks();
+      this.writeFilteredContentLinks(pages);
       await this.writeContentConfig(pages);
-      await this.installDeps({ clean: true });
+      await this.installDeps();
 
-      const buildOutDir = path.join(this.projectDir, 'dist');
       await this.runBuild(buildOutDir);
       return buildOutDir;
     } finally {
@@ -463,9 +472,9 @@ export const collections = {
     }
   }
 
-  /** Symlink the full root so asset files remain available via
-   *  the symlink tree. The content config handles which docs are loaded. */
-  private writeFilteredContentLinks(): void {
+  /** Symlink the full root so assets are available for the Code component.
+   *  Content filtering is handled by writeContentConfig. */
+  private writeFilteredContentLinks(pages: DocPage[]): void {
     const contentParent = path.join(this.projectDir, 'src', 'content');
     const contentDir = path.join(contentParent, 'docs');
 
