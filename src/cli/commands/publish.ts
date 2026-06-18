@@ -9,7 +9,7 @@ import { ContentGraphEngine } from '../../content-graph/engine.js';
 import { RuntimeAdapter } from '../../runtime/adapter.js';
 import { filterDocsByTarget } from '../../publish/filter.js';
 import { collectSources } from '../../publish/source-copier.js';
-import type { DocPage, DocsGraph, ResolvedConfig, GitTargetConfig, FileTargetConfig, ResolvedPublishTarget } from '../../types.js';
+import type { DocPage, DocsGraph, ResolvedConfig, GitTargetConfig, FileTargetConfig, ResolvedPublishTarget, PublishArtefact } from '../../types.js';
 
 interface PublishOptions {
   dryRun?: boolean;
@@ -85,6 +85,16 @@ export function publishCommand(): Command {
     });
 }
 
+function artefactLabel(artefact: PublishArtefact): string {
+  const { type, config } = artefact;
+  if (type === 'git') {
+    const gitCfg = config as GitTargetConfig;
+    return `git → ${gitCfg.targetDir} (${gitCfg.repo}#${gitCfg.branch})`;
+  }
+  const fileCfg = config as FileTargetConfig;
+  return `file → ${fileCfg.targetDir}`;
+}
+
 async function publishTarget(
   target: ResolvedPublishTarget,
   config: ResolvedConfig,
@@ -100,6 +110,15 @@ async function publishTarget(
   }
 
   console.log(pc.cyan(`\nTarget "${target.name}": ${matchedDocs.length} document(s)`));
+
+  const hasStatic = !!target.static;
+  const hasSources = !!target.sources;
+
+  if (!hasStatic && !hasSources) {
+    console.log(pc.yellow(`  No artefacts configured for target "${target.name}", skipping.`));
+    results.push({ target: target.name, status: 'succeeded' });
+    return;
+  }
 
   // Warn about unknown publishTo values
   for (const doc of matchedDocs) {
@@ -117,13 +136,15 @@ async function publishTarget(
 
   // Dry-run
   if (opts?.dryRun) {
-    console.log(pc.cyan(`  Type: ${target.type}`));
+    if (hasStatic) {
+      console.log(`  Static: ${artefactLabel(target.static!)}`);
+    }
+    if (hasSources) {
+      console.log(`  Sources: ${artefactLabel(target.sources!)}`);
+    }
     console.log(`  Matched docs (${matchedDocs.length}):`);
     for (const doc of matchedDocs) {
       console.log(`    - ${doc.relativePath}`);
-    }
-    if (target.sourcesTargetDir) {
-      console.log(`  Sources → ${target.sourcesTargetDir}`);
     }
     results.push({ target: target.name, status: 'succeeded' });
     return;
@@ -131,8 +152,12 @@ async function publishTarget(
 
   // Confirmation prompt
   if (!opts?.force) {
+    const artefactSummary = [
+      hasStatic ? `static: ${artefactLabel(target.static!)}` : '',
+      hasSources ? `sources: ${artefactLabel(target.sources!)}` : '',
+    ].filter(Boolean).join('\n     ');
     const answer = await readlineQuestion(
-      `\nPublish ${matchedDocs.length} document(s) to "${target.name}" (${target.type})? (y/N) `,
+      `\nPublish ${matchedDocs.length} document(s) to "${target.name}"?\n     ${artefactSummary}\n  Proceed? (y/N) `,
     );
     if (!answer.toLowerCase().startsWith('y')) {
       console.log(pc.yellow('  Skipped.'));
@@ -141,81 +166,79 @@ async function publishTarget(
     }
   }
 
-  // Build in ephemeral dir
+  // Build + collect sources into temp workspace
   const adapter = new RuntimeAdapter({ config, graph });
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), `fea-docs-publish-${target.name}-`));
-  let buildOutDir: string;
 
   try {
-    buildOutDir = await adapter.createFilteredBuild(matchedDocs, tmpDir, config);
-    console.log(pc.green(`  Built ${matchedDocs.length} docs for "${target.name}"`));
+    let buildOutDir: string | undefined;
+    let sourceFilesDir: string | undefined;
+
+    if (hasStatic) {
+      buildOutDir = await adapter.createFilteredBuild(matchedDocs, tmpDir, config);
+      console.log(pc.green(`  Built ${matchedDocs.length} docs for "${target.name}"`));
+    }
+
+    if (hasSources) {
+      sourceFilesDir = path.join(tmpDir, 'sources');
+      collectSources({
+        matchedPages: matchedDocs.map((d) => ({
+          absolutePath: d.absolutePath,
+          relativePath: d.relativePath,
+        })),
+        root: config.root,
+        outputDir: sourceFilesDir,
+      });
+    }
+
+    // Deploy each artefact
+    if (hasStatic) {
+      await deployArtefact(target.name, target.static!, buildOutDir!, matchedDocs.length, opts);
+    }
+    if (hasSources) {
+      await deployArtefact(target.name, target.sources!, sourceFilesDir!, matchedDocs.length, opts);
+    }
+
+    results.push({ target: target.name, status: 'succeeded' });
   } catch (err) {
     fs.rmSync(tmpDir, { recursive: true, force: true });
     throw err;
   }
 
-  // Collect source files if configured
-  let sourceFilesDir: string | undefined;
-  if (target.sourcesTargetDir) {
-    sourceFilesDir = path.join(tmpDir, 'sources');
-    collectSources({
-      matchedPages: matchedDocs.map((d) => ({
-        absolutePath: d.absolutePath,
-        relativePath: d.relativePath,
-      })),
-      root: config.root,
-      outputDir: sourceFilesDir,
-    });
-  }
-
-  // Deploy
-  const deployed = await deployToTarget(target, buildOutDir, sourceFilesDir, matchedDocs.length, opts);
-  if (deployed) {
-    results.push({ target: target.name, status: 'succeeded' });
-  } else {
-    results.push({ target: target.name, status: 'failed', reason: 'Deploy failed' });
-  }
-
   fs.rmSync(tmpDir, { recursive: true, force: true });
 }
 
-async function deployToTarget(
-  target: ResolvedPublishTarget,
-  buildDir: string,
-  sourceFilesDir: string | undefined,
+async function deployArtefact(
+  targetName: string,
+  artefact: PublishArtefact,
+  contentDir: string,
   docCount: number,
   opts: PublishOptions | undefined,
-): Promise<boolean> {
-  if (target.type === 'file') {
-    const fileCfg = target.config as FileTargetConfig;
+): Promise<void> {
+  if (artefact.type === 'file') {
+    const fileCfg = artefact.config as FileTargetConfig;
     const { publishToFile } = await import('../../publish/file-publisher.js');
     publishToFile({
       targetDir: fileCfg.targetDir,
-      sourcesTargetDir: target.sourcesTargetDir,
-      buildDir,
-      sourceFilesDir,
+      contentDir,
     });
-    return true;
+    return;
   }
 
-  if (target.type === 'git') {
-    const gitCfg = target.config as GitTargetConfig;
+  if (artefact.type === 'git') {
+    const gitCfg = artefact.config as GitTargetConfig;
     const { publishToGit } = await import('../../publish/git-publisher.js');
     publishToGit({
       repo: gitCfg.repo,
       branch: gitCfg.branch,
       targetDir: gitCfg.targetDir,
-      sourcesTargetDir: target.sourcesTargetDir,
-      buildDir,
-      sourceFilesDir,
-      name: target.name,
+      contentDir,
+      name: targetName,
       docCount,
       clean: opts?.clean,
     });
-    return true;
+    return;
   }
-
-  return false;
 }
 
 function readlineQuestion(prompt: string): Promise<string> {

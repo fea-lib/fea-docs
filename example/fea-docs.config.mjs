@@ -19,19 +19,35 @@ export default {
   },
   publish: {
     recipes: {
-      type: 'file',
-      config: {
-        targetDir: path.join(repoRoot, 'tmp', 'recipes'),
+      static: {
+        type: 'file',
+        config: {
+          targetDir: path.join(repoRoot, 'tmp', 'recipes'),
+        },
       },
-      sourcesTargetDir: 'sources',
+      sources: {
+        type: 'file',
+        config: {
+          targetDir: path.join(repoRoot, 'tmp', 'recipes', 'sources'),
+        },
+      },
     },
     engineering: {
-      type: 'git',
-      sourcesTargetDir: 'docs/engineering',
-      config: {
-        repo: 'git@github.com:fea-lib/demo-fea-docs.git',
-        branch: 'main',
-        targetDir: 'static/engineering',
+      static: {
+        type: 'git',
+        config: {
+          repo: 'git@github.com:fea-lib/demo-fea-docs.git',
+          branch: 'main',
+          targetDir: 'static/engineering',
+        },
+      },
+      sources: {
+        type: 'git',
+        config: {
+          repo: 'git@github.com:fea-lib/demo-fea-docs.git',
+          branch: 'main',
+          targetDir: 'docs/engineering',
+        },
       },
     },
   },

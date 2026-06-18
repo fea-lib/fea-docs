@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { ResolvedConfig, ResolvedPublishTarget, PublishTarget } from '../types.js';
+import type { ResolvedConfig, ResolvedPublishTarget, PublishArtefact, PublishTarget } from '../types.js';
 import { normalizeBasePath } from '../utils/base-path.js';
 
 const CONFIG_CANDIDATES = [
@@ -58,29 +58,35 @@ export async function resolveConfig(
     ...(envPort ? { port: Number(envPort) } : {}),
   };
 
-  // Resolve publish targets
+  // Resolve publish targets — each target has optional static/sources artefacts
   const resolvedPublish: Record<string, ResolvedPublishTarget> = {};
   if (rawPublish) {
     for (const [name, target] of Object.entries(rawPublish)) {
-      if (!target.type || !['git', 'file'].includes(target.type)) {
-        console.warn(`  Publish target "${name}": unknown type "${target.type}", skipping`);
+      const resolved: ResolvedPublishTarget = { name };
+      let hasValid = false;
+
+      if (target.static) {
+        const artefact = validateArtefact(name, 'static', target.static);
+        if (artefact) {
+          resolved.static = artefact;
+          hasValid = true;
+        }
+      }
+
+      if (target.sources) {
+        const artefact = validateArtefact(name, 'sources', target.sources);
+        if (artefact) {
+          resolved.sources = artefact;
+          hasValid = true;
+        }
+      }
+
+      if (!hasValid) {
+        console.warn(`  Publish target "${name}": no valid artefacts configured, skipping`);
         continue;
       }
-      if (target.type === 'git') {
-        const gitCfg = target.config as { repo?: string; branch?: string; targetDir?: string };
-        if (!gitCfg.repo || !gitCfg.branch || gitCfg.targetDir === undefined) {
-          console.warn(`  Publish target "${name}": missing required git fields (repo, branch, targetDir), skipping`);
-          continue;
-        }
-      }
-      if (target.type === 'file') {
-        const fileCfg = target.config as { targetDir?: string };
-        if (fileCfg.targetDir === undefined) {
-          console.warn(`  Publish target "${name}": missing required file field (targetDir), skipping`);
-          continue;
-        }
-      }
-      resolvedPublish[name] = { name, ...target };
+
+      resolvedPublish[name] = resolved;
     }
   }
 
@@ -110,6 +116,32 @@ export async function resolveConfig(
     base: normalizeBasePath(cliFlags.base ?? envConfig.base ?? fileConfig.base ?? DEFAULT_CONFIG.base),
     ...(Object.keys(resolvedPublish).length > 0 ? { publish: resolvedPublish } : {}),
   };
+}
+
+function validateArtefact(
+  targetName: string,
+  artefactName: string,
+  artefact: PublishArtefact,
+): PublishArtefact | null {
+  if (!artefact.type || !['git', 'file'].includes(artefact.type)) {
+    console.warn(`  Publish target "${targetName}": artefact "${artefactName}" has unknown type "${artefact.type}", skipping`);
+    return null;
+  }
+  if (artefact.type === 'git') {
+    const gitCfg = artefact.config as { repo?: string; branch?: string; targetDir?: string };
+    if (!gitCfg.repo || !gitCfg.branch || gitCfg.targetDir === undefined) {
+      console.warn(`  Publish target "${targetName}": artefact "${artefactName}" missing required git fields (repo, branch, targetDir), skipping`);
+      return null;
+    }
+  }
+  if (artefact.type === 'file') {
+    const fileCfg = artefact.config as { targetDir?: string };
+    if (fileCfg.targetDir === undefined) {
+      console.warn(`  Publish target "${targetName}": artefact "${artefactName}" missing required file field (targetDir), skipping`);
+      return null;
+    }
+  }
+  return { ...artefact };
 }
 
 function findConfigInCwd(cwd = process.cwd()): string | null {

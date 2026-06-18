@@ -10,6 +10,7 @@ export type {
   DocsGraph,
   NavItem,
   NavTree,
+  PublishArtefact,
   PublishTarget,
   GitTargetConfig,
   FileTargetConfig,

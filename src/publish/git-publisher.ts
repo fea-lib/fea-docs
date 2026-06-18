@@ -7,9 +7,7 @@ export interface GitPublisherOptions {
   repo: string;
   branch: string;
   targetDir: string;
-  sourcesTargetDir?: string;
-  buildDir: string;
-  sourceFilesDir?: string;
+  contentDir: string;
   name: string;
   docCount: number;
   clean?: boolean;
@@ -21,7 +19,7 @@ function getCloneDir(repo: string): string {
 }
 
 export function publishToGit(options: GitPublisherOptions): void {
-  const { repo, branch, targetDir, buildDir, name, docCount, clean } = options;
+  const { repo, branch, targetDir, contentDir, name, docCount, clean } = options;
   const cloneDir = getCloneDir(repo);
 
   if (clean && fs.existsSync(cloneDir)) {
@@ -39,15 +37,7 @@ export function publishToGit(options: GitPublisherOptions): void {
 
   const targetPath = path.join(cloneDir, targetDir);
   fs.mkdirSync(targetPath, { recursive: true });
-  execSync(`rsync -a --delete "${buildDir}/" "${targetPath}/"`, { stdio: 'inherit' });
-
-  if (options.sourcesTargetDir && options.sourceFilesDir) {
-    const sourceTarget = path.join(cloneDir, options.sourcesTargetDir);
-    fs.mkdirSync(sourceTarget, { recursive: true });
-    execSync(`rsync -a --delete "${options.sourceFilesDir}/" "${sourceTarget}/"`, {
-      stdio: 'inherit',
-    });
-  }
+  execSync(`rsync -a --delete "${contentDir}/" "${targetPath}/"`, { stdio: 'inherit' });
 
   execSync(`git -C "${cloneDir}" add .`, { stdio: 'inherit' });
   try {

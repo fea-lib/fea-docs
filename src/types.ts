@@ -112,10 +112,14 @@ export interface FileTargetConfig {
 
 export type PublishTargetType = 'git' | 'file';
 
-export interface PublishTarget {
+export interface PublishArtefact {
   type: PublishTargetType;
-  sourcesTargetDir?: string;
   config: GitTargetConfig | FileTargetConfig;
+}
+
+export interface PublishTarget {
+  static?: PublishArtefact;
+  sources?: PublishArtefact;
 }
 
 export interface ResolvedPublishTarget extends PublishTarget {
