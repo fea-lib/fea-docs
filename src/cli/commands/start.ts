@@ -103,6 +103,7 @@ export function startCommand(): Command {
         // Start dev server
         console.log(pc.cyan(`Starting dev server on port ${config.port}...`));
         const port = await adapter.startDev(config.port);
+        console.log(`##FEA_DOCS_PORT=${port}##`);
         const url = `http://localhost:${port}${joinBasePath(config.base, '/')}`;
         console.log(`\n${pc.green('Docs available at:')} ${pc.bold(pc.underline(url))}\n`);
 
@@ -124,10 +125,18 @@ export function startCommand(): Command {
         }
 
         // Keep process alive
-        process.on('SIGINT', () => {
+        let shuttingDown = false;
+
+        const shutdown: NodeJS.SignalsListener = (signal) => {
+          if (shuttingDown) return;
+          shuttingDown = true;
+          console.error(`Received ${signal}, shutting down...`);
           adapter.stopDev();
           process.exit(0);
-        });
+        };
+
+        process.on('SIGINT', shutdown);
+        process.on('SIGTERM', shutdown);
       } catch (err) {
         console.error(pc.red('Error:'), err instanceof Error ? err.message : String(err));
         process.exit(1);

@@ -5,6 +5,14 @@ import type { DocPage, DocsGraph, ResolvedConfig } from '../types.js';
 import { feaDocsWorkspaceCacheDir } from '../utils/cache-dir.js';
 import { joinBasePath } from '../utils/base-path.js';
 
+function symlinkTargetEqual(filePath: string, expected: string): boolean {
+  try {
+    return fs.readlinkSync(filePath) === expected;
+  } catch {
+    return false;
+  }
+}
+
 // Keep runtime content-loader discovery aligned with ContentGraphEngine:
 // include hidden dot-prefixed files/dirs by default, then rely on
 // .gitignore and user-configured ignore rules for exclusions.
@@ -18,6 +26,17 @@ export const CONTENT_GLOB_PATTERNS = [
 export interface RuntimeAdapterOptions {
   config: ResolvedConfig;
   graph: DocsGraph;
+}
+
+function writeIfChanged(filePath: string, content: string): boolean {
+  try {
+    const existing = fs.readFileSync(filePath, 'utf-8');
+    if (existing === content) return false;
+  } catch {
+    // file doesn't exist — always write
+  }
+  fs.writeFileSync(filePath, content);
+  return true;
 }
 
 /**
@@ -81,7 +100,7 @@ export class RuntimeAdapter {
         ...this.options.config.dependencies,
       },
     };
-    fs.writeFileSync(
+    writeIfChanged(
       path.join(this.projectDir, 'package.json'),
       JSON.stringify(pkg, null, 2),
     );
@@ -185,7 +204,7 @@ export default defineConfig({
 });
 `.trimStart();
 
-    fs.writeFileSync(path.join(this.projectDir, 'astro.config.mjs'), astroConfig);
+    writeIfChanged(path.join(this.projectDir, 'astro.config.mjs'), astroConfig);
   }
 
   private resolveSiteTitle(config: ResolvedConfig): string {
@@ -305,7 +324,7 @@ export default function remarkRewriteMdLinks() {
 }
 `.trimStart();
 
-    fs.writeFileSync(path.join(this.projectDir, 'remark-rewrite-md-links.mjs'), plugin);
+    writeIfChanged(path.join(this.projectDir, 'remark-rewrite-md-links.mjs'), plugin);
   }
 
   /**
@@ -340,7 +359,7 @@ export default function remarkStripLeadH1() {
 }
 `.trimStart();
 
-    fs.writeFileSync(path.join(this.projectDir, 'remark-strip-lead-h1.mjs'), plugin);
+    writeIfChanged(path.join(this.projectDir, 'remark-strip-lead-h1.mjs'), plugin);
   }
 
   /**
@@ -354,10 +373,12 @@ export default function remarkStripLeadH1() {
     const contentParent = path.join(this.projectDir, 'src', 'content');
     const contentDir = path.join(contentParent, 'docs');
 
-    // Point src/content/docs at the full docs root.
-    fs.rmSync(contentDir, { recursive: true, force: true });
-    fs.mkdirSync(contentParent, { recursive: true });
-    fs.symlinkSync(this.options.config.root, contentDir, 'dir');
+    // Skip symlink creation if it already points to the right target.
+    if (!symlinkTargetEqual(contentDir, this.options.config.root)) {
+      fs.rmSync(contentDir, { recursive: true, force: true });
+      fs.mkdirSync(contentParent, { recursive: true });
+      fs.symlinkSync(this.options.config.root, contentDir, 'dir');
+    }
 
     // Always write a redirect from / to the first content page.
     // A top-level README gets slug '' but Starlight serves it at /readme/,
@@ -408,7 +429,7 @@ export const collections = {
   }),
 };
 `;
-    fs.writeFileSync(path.join(this.projectDir, 'src', 'content.config.ts'), config);
+    writeIfChanged(path.join(this.projectDir, 'src', 'content.config.ts'), config);
   }
 
   private async installDeps(options?: { clean?: boolean }): Promise<void> {
