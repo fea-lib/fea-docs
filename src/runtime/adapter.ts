@@ -14,13 +14,11 @@ function symlinkTargetEqual(filePath: string, expected: string): boolean {
 }
 
 // Keep runtime content-loader discovery aligned with ContentGraphEngine:
-// include hidden dot-prefixed files/dirs by default, then rely on
-// .gitignore and user-configured ignore rules for exclusions.
+// exclude hidden dot-prefixed dirs, matching DEFAULT_IGNORE_GLOBS.
 export const CONTENT_GLOB_PATTERNS = [
   '**/*.{md,mdx}',
-  '**/.*/**/*.{md,mdx}',
-  '**/.*.{md,mdx}',
   '!**/node_modules/**',
+  '!**/.*/**',
 ];
 
 export interface RuntimeAdapterOptions {
@@ -178,9 +176,6 @@ export default defineConfig({
   integrations: [
     starlight({
       title: ${JSON.stringify(title)},
-      sidebar: [
-        { autogenerate: { directory: 'docs' } },
-      ],
     }),
     ${frameworkIntegrations}
   ],
