@@ -80,9 +80,8 @@ describe('RuntimeAdapter content loader config', () => {
 
     expect(CONTENT_GLOB_PATTERNS).toEqual([
       '**/*.{md,mdx}',
-      '**/.*/**/*.{md,mdx}',
-      '**/.*.{md,mdx}',
       '!**/node_modules/**',
+      '!**/.*/**',
     ]);
     expect(contentConfig).toContain(`pattern: ${JSON.stringify(CONTENT_GLOB_PATTERNS, null, 6).replace(/\n/g, '\n      ')}`);
   });
@@ -120,7 +119,7 @@ describe('RuntimeAdapter content loader config', () => {
     expect(path.resolve(path.dirname(contentDir), symlinkTarget)).toBe(path.resolve(tmpDir));
   });
 
-  it('writes Astro config with Starlight autogenerate sidebar', async () => {
+  it('writes Astro config without explicit sidebar (uses Starlight default tree)', async () => {
     const graph = makeGraph(tmpDir, [
       { rel: 'guide/intro.md', label: 'Intro', entryId: 'guide/intro' },
     ]);
@@ -136,8 +135,7 @@ describe('RuntimeAdapter content loader config', () => {
     const astroConfig = fs.readFileSync(path.join(adapter.projectDir, 'astro.config.mjs'), 'utf-8');
 
     expect(astroConfig).toContain("base: \"/\"");
-    expect(astroConfig).toContain("sidebar: [");
-    expect(astroConfig).toContain("{ autogenerate: { directory: 'docs' } }");
+    expect(astroConfig).not.toContain("sidebar:");
     expect(astroConfig).not.toContain('nav-entry-not-found');
   });
 
