@@ -444,6 +444,11 @@ export const collections = {
       cwd: this.projectDir,
       stdio: 'pipe',
     });
+    // npm bug #4828: optional platform deps sometimes skipped on first install
+    execSync('npm install --loglevel=warn', {
+      cwd: this.projectDir,
+      stdio: 'pipe',
+    });
   }
 
   /**
