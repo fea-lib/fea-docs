@@ -225,16 +225,16 @@ export default defineConfig({
    * Write a remark plugin that rewrites .md/.mdx links to their slug URLs
    * at render time. This runs inside Astro so it operates on the actual
    * source files via the symlink — no file copying needed.
+   *
+   * The entryId (Starlight slug) is derived deterministically from the
+   * relative file path rather than from a static map, so newly-added files
+   * during dev are handled correctly without requiring a server restart.
    */
   private async writeRemarkPlugin(): Promise<void> {
-    // Map relativePath → entryId URL (what Starlight actually serves).
-    const slugMap = Object.fromEntries(
-      this.options.graph.pages.map((p) => [p.relativePath.replace(/\\/g, '/'), p.entryId]),
-    );
     // Astro 6 Content Layer resolves file paths through the symlink chain and
     // passes the full app-internal path to remark: e.g.
     //   <projectDir>/src/content/docs/docs/2-plan.md
-    // We need to strip the app content dir prefix to get the slug-map key.
+    // We need to strip the app content dir prefix to get the relative path.
     // We also keep sourceRoot as a fallback for other Astro versions.
     const appContentDir = path
       .join(this.projectDir, 'src', 'content', 'docs')
@@ -246,7 +246,6 @@ export default defineConfig({
 import path from 'node:path';
 import { visit } from 'unist-util-visit';
 
-const slugMap = ${JSON.stringify(slugMap, null, 2)};
 const appContentDir = ${JSON.stringify(appContentDir)};
 const sourceRoot = ${JSON.stringify(sourceRoot)};
 const basePath = ${JSON.stringify(basePath)};
@@ -255,6 +254,13 @@ function stripPrefix(absPath, prefix) {
   const p = absPath.replace(/\\\\/g, '/');
   if (p.startsWith(prefix + '/')) return p.slice(prefix.length + 1);
   return null;
+}
+
+function pathToEntryId(relativePath) {
+  let id = relativePath.replace(/\\\\/g, '/').replace(/\\.(md|mdx)$/i, '').toLowerCase();
+  if (id.endsWith('/index')) id = id.slice(0, -6);
+  else if (id === 'index') id = '';
+  return id;
 }
 
 export default function remarkRewriteMdLinks() {
@@ -297,8 +303,7 @@ export default function remarkRewriteMdLinks() {
 
       if (/\\.mdx?$/i.test(urlPath)) {
         const resolved = resolveRelative(urlPath);
-        const entryId = slugMap[resolved];
-        if (entryId === undefined) return url;
+        const entryId = pathToEntryId(resolved);
         return toBaseUrl('/' + entryId + '/') + suffix;
       }
 
