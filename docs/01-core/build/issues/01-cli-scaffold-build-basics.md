@@ -10,14 +10,14 @@ title: "01 — CLI scaffold & build basics"
 
 **Blocked by:** None — can start immediately
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `fea-docs build` scans the execution directory recursively without error
-- [ ] Ignore rules: `.gitignore` honored at root and subdirectory level; own output dir, `.git`, `node_modules` never scanned/copied
-- [ ] Empty/no-renderable root produces output with an empty nav and a message page; exit code 0
-- [ ] `fea-docs --help` and bare `fea-docs` print usage
-- [ ] Unknown subcommand or flag prints an error + usage and exits non-zero
-- [ ] Build is non-interactive and deterministic (no prompts, no TTY requirements, stable output artifact)
+- [x] `fea-docs build` scans the execution directory recursively without error
+- [x] Ignore rules: `.gitignore` honored at root and subdirectory level; own output dir, `.git`, `node_modules` never scanned/copied
+- [x] Empty/no-renderable root produces output with an empty nav and a message page; exit code 0
+- [x] `fea-docs --help` and bare `fea-docs` print usage
+- [x] Unknown subcommand or flag prints an error + usage and exits non-zero
+- [x] Build is non-interactive and deterministic (no prompts, no TTY requirements, stable output artifact)
 
 ## Design Document
 
@@ -69,3 +69,18 @@ title: "01 — CLI scaffold & build basics"
     - Unknown subcommands and invalid flags exit non-zero (`1`) with error messages + usage.
     - Empty or non-renderable project directories build successfully (exit code `0`) with empty nav and message page.
     - Non-interactive, headless execution without TTY prompts.
+
+## Resolution
+
+Resolved on `new-v2` per the design doc above; implementation notes and
+hard-won conventions live in `docs/01-core/build/CONVENTIONS.md`.
+
+- **Libraries:** `commander` 15 (routing, help, error + exit-code surface),
+  `fast-glob` (recursive discovery + exclusion globs), `node-ignore`
+  (`.gitignore` at root and every subdirectory), `valibot` (schema-verified
+  option boundary). Compiled to ESM by `tsc` (NodeNext).
+- **Tests:** `src/__tests__/{content-graph,build,cli,build-options}.test.ts`
+  cover the acceptance boxes; run with `npm test` (38 tests).
+- **Known future wiring (out of scope here):** `--config` and `--strict`
+  parse and schema-verify, but are consumed by tickets 09/12. Real page
+  rendering and the HTML/CSS shell land in tickets 02/03.
