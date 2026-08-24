@@ -4,9 +4,11 @@ import zlib from "node:zlib";
 import {compileSync} from "@mdx-js/mdx";
 import {prerender} from "react-dom/static";
 import {jsx} from "react/jsx-runtime";
+import esbuild from "esbuild";
 
 const fixturesDir = path.join(import.meta.dirname, "fixtures");
 const outDir = path.join(import.meta.dirname, "out");
+const tempDir = path.join(import.meta.dirname, ".out-build");
 
 const bytes = (s) => Buffer.byteLength(s, "utf8");
 const zipped = (s) => zlib.deflateSync(Buffer.from(s, "utf8")).length;
@@ -49,66 +51,127 @@ async function renderStaticHtml(file) {
   return new Response(prelude).text();
 }
 
+function firstH1(html) {
+  const m = html.match(/<h1[^>]*>(.*?)<\/h1>/);
+  if (!m) return null;
+  return m[1].replace(/<[^>]+>/g, "").replaceAll("&amp;", "&");
+}
+
+// The *real* renderer extension: assemble a full, loadable page (doctype,
+// head, title from first H1, body) and for hybrid pages reference the chunks —
+// so the emitted HTML actually contains the JS it must load.
+function pageShell(title, bodyHtml, scripts) {
+  const lines = [
+    "<!DOCTYPE html>",
+    '<html lang="en">',
+    "<head>",
+    '  <meta charset="utf-8">',
+    '  <meta name="viewport" content="width=device-width, initial-scale=1">',
+    `  <title>${title ?? "fea-docs"}</title>`,
+    "</head>",
+    "<body>",
+    bodyHtml,
+  ];
+  for (const src of scripts) {
+    lines.push(`<script type="module" src="${src}"></script>`);
+  }
+  lines.push("</body>", "</html>");
+  return lines.join("\n");
+}
+
+// Build the *shared, cacheable* vendor chunk (react/jsx-runtime), via esbuild —
+// a self-contained ESM module every hybrid page references.
+async function buildVendorChunk() {
+  const entry = path.join(tempDir, "vendor-entry.mjs");
+  fs.writeFileSync(entry, `import {jsx, Fragment} from "react/jsx-runtime";\nexport {jsx, Fragment};\n`);
+  return esbuildBuild(entry, "vendor.js");
+}
+
+// Build the page-scoped chunk that hydrates this page's hybrid components:
+// esbuild bundles the hydrate entry + its transitive graph (components, react).
+async function buildPageChunk(outName) {
+  const entry = path.join(tempDir, "page-hydrate.mjs");
+  let src = fs.readFileSync(path.join(fixturesDir, "page-hydrate.mjs"), "utf8");
+  // The hydrate entry lives in tempDir; point its "./Hybrid.mjs" import at
+  // the real fixture (relative from tempDir to fixtures/ is "../fixtures").
+  src = src.replaceAll("./Hybrid.mjs", path.posix.relative(tempDir, fixturesDir) + "/Hybrid.mjs");
+  fs.writeFileSync(entry, src);
+  return esbuildBuild(entry, outName);
+}
+
+async function esbuildBuild(entry, outName) {
+  const rel = path.relative(tempDir, entry);
+  await esbuild.build({
+    absWorkingDir: tempDir,
+    entryPoints: [{in: rel, out: outName}],
+    outdir: tempDir,
+    format: "esm",
+    bundle: true,
+  });
+  const named = path.join(tempDir, `${outName}.js`);
+  const built = fs.readFileSync(named, "utf8");
+  fs.writeFileSync(path.join(outDir, outName), built);
+  return built;
+}
+
 async function main() {
   fs.mkdirSync(outDir, {recursive: true});
-  // wipe the out dir first (escape prior runs)
+  fs.mkdirSync(tempDir, {recursive: true});
   for (const name of fs.readdirSync(outDir)) fs.unlinkSync(path.join(outDir, name));
+  for (const name of fs.readdirSync(tempDir)) fs.unlinkSync(path.join(tempDir, name));
+
+  const vendor = await buildVendorChunk();
+  fs.writeFileSync(path.join(outDir, "vendor.js"), vendor);
 
   const lines = [];
   let pageChunks = 0;
   const failures = [];
 
   for (const [file, {uses}] of Object.entries(MANIFEST)) {
-    const html = await renderStaticHtml(file);
+    const bodyHtml = await renderStaticHtml(file);
     const needsJs = Object.values(uses).some((mode) => mode === "hybrid");
     const base = file.replace(/\.mdx$/, "");
 
-    fs.writeFileSync(path.join(outDir, `${base}.html`), html);
-    lines.push(`PAGE    ${base}.html                 raw=${bytes(html)}  gz=${zipped(html)}`);
+    const scripts = [];
+    if (needsJs) {
+      const chunk = await buildPageChunk(`${base}.page.js`);
+      pageChunks += 1;
+      scripts.push("vendor.js", `${base}.page.js`);
+    }
 
-    // Correctness checks — prove the verdict rather than just print it.
+    const html = pageShell(firstH1(bodyHtml), bodyHtml, scripts);
+    fs.writeFileSync(path.join(outDir, `${base}.html`), html);
+
+    lines.push(`PAGE    ${base}.html                 raw=${bytes(html)}  gz=${zipped(html)}`);
+    lines.push(`        title=${JSON.stringify(firstH1(bodyHtml) ?? base)}  scripts=[${scripts.join(", ") || "none"}]`);
+
     if (file === "page-static.mdx") {
-      if (!html.includes("hallo tobi")) failures.push("static page missing <p>hallo tobi</p>");
+      if (!bodyHtml.includes("hallo tobi")) failures.push("static page missing <p>hallo tobi</p>");
       if (needsJs) failures.push("static page wrongly flagged needsJs");
+      if (html.includes("<script")) failures.push("static page must ship ZERO JS — no <script> in the page");
+      if (!html.includes("<title>Static page</title>")) failures.push("static page shell missing <title>Static page</title>");
     }
     if (file === "page-hybrid.mdx") {
-      if (!html.includes("<button>count: 0</button>")) failures.push("hybrid page missing static <button>count: 0</button>");
-      // React server render runs useState etc. but `useEffect` is a *noop* at
-      // build (verified in react-dom-server-legacy.node.development.js: useEffect: noop).
-      // So the effect's post-mutation state ("done") is NOT in static HTML — the
-      // effect exists only in the hydrated client pass. The static output must
-      // still be correct-as-authored for the pre-effect state.
-      if (!html.includes("<output>idle</output>")) failures.push("hybrid page: effect component should render pre-effect state <output>idle</output> (effects are build-time no-ops)");
-      if (!needsJs) failures.push("hybrid page wrongly flagged static");
+      if (!bodyHtml.includes("<button data-hydrate=\"Counter\">count: 0</button>")) failures.push("hybrid page missing data-hydrate marker on Counter");
+      if (!bodyHtml.includes("<output data-hydrate=\"Effect\">idle</output>")) failures.push("hybrid page: effect comp should render pre-effect state with marker (effects = build-time no-ops)");
+      if (!html.includes('<script type="module" src="vendor.js"></script>')) failures.push("hybrid page HTML missing the vendor <script>");
+      if (!html.includes(`<script type="module" src="page-hybrid.page.js"></script>`)) failures.push("hybrid page HTML missing the page-chunk <script>");
+      if (firstH1(bodyHtml) !== "Hybrid page") failures.push("hybrid <title> should be 'Hybrid page'");
     }
-
-    if (needsJs) {
-      const hybrid = Object.entries(uses)
-        .filter(([, mode]) => mode === "hybrid")
-        .map(([name]) => name);
-      const chunk = `// page chunk — hydrates ${hybrid.join(", ")} in place\n// (emitted only because a hybrid component is used on this page)\nexport const pageComponents = ${JSON.stringify(hybrid)};\n`;
-      fs.writeFileSync(path.join(outDir, `${base}.page.js`), chunk);
-      lines.push(`CHUNK ${base}.page.js                raw=${bytes(chunk)}  gz=${zipped(chunk)}`);
-      pageChunks += 1;
-    }
-    lines.push(`      needsJs=${needsJs}  (${Object.entries(uses).map(([n, m]) => `${n}:${m}`).join(", ")})\n`);
+    lines.push(`        needsJs=${needsJs}  (${Object.entries(uses).map(([n, m]) => `${n}:${m}`).join(", ")})\n`);
   }
 
-  // The shared vendor chunk (react runtime), written once.
-  const vendor = `// vendor chunk — react/jsx-runtime (shared, cacheable across pages)\nexport {jsx, Fragment} from "react/jsx-runtime";\n`;
-  fs.writeFileSync(path.join(outDir, "vendor.js"), vendor);
-  lines.push(`VENDOR vendor.js                    raw=${bytes(vendor)}  gz=${zipped(vendor)}  (shared)`);
-
-  const jsTotal = bytes(vendor) + [...fs.readdirSync(outDir)].filter((f) => f.endsWith(".js") && f !== "vendor.js").reduce((a, f) => a + bytes(fs.readFileSync(path.join(outDir, f))), 0);
-  lines.push(`\npage chunks: ${pageChunks}  (both pages share the single vendor chunk)`);
-  lines.push(`JS shipped in total: ${jsTotal}B raw`);
+  lines.push(`VENDOR  vendor.js             bytes=${bytes(vendor)}  gz=${zipped(vendor)}  (shared, cacheable)`);
+  const jsFiles = fs.readdirSync(outDir).filter((f) => f.endsWith(".js"));
+  const jsTotal = jsFiles.reduce((a, f) => a + bytes(fs.readFileSync(path.join(outDir, f))), 0);
+  lines.push(`page chunks: ${pageChunks} · js files: ${jsFiles.join(", ")} · total JS: ${jsTotal}B raw`);
 
   console.log(lines.join("\n"));
   if (failures.length) {
     console.error("\nASSERTION FAILURES:\n" + failures.join("\n"));
     process.exit(1);
   }
-  console.log("\nVERDICT-CHECK PASSED: static page ships zero JS, hybrid page ships page chunk, HTML correct.");
+  console.log("\nVERDICT-CHECK PASSED — HTML carries the JS it must load; vendor shared; hybrid hydratable.");
 }
 
 await main();
